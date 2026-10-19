@@ -1,0 +1,11 @@
+KLEEM Kabelplan – Offline-App für iPad
+
+1. Den Ordnerinhalt (index.html, sw.js, manifest.webmanifest, icon-*.png) auf einen HTTPS-Webspace laden,
+   z. B. in einen Unterordner von kleem.tv (https://kleem.tv/kabelplan/) oder auf GitHub Pages.
+   Wichtig: HTTPS, sonst funktioniert der Offline-Speicher nicht.
+2. Am iPad die Adresse in Safari öffnen, Teilen-Symbol > "Zum Home-Bildschirm".
+3. Ab jetzt die App über das Home-Symbol starten. Sie läuft danach ohne Internet.
+
+Daten: Pläne und Geräte liegen nur am iPad (in der Home-Bildschirm-App).
+Regelmäßig unter "Pläne > Backup erstellen" sichern, z. B. in iCloud Drive.
+Update: neue Dateien hochladen und in sw.js die Versionsnummer (kabelplan-v1 -> v2) erhöhen.

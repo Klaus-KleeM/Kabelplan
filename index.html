@@ -1,0 +1,886 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Kabelplan">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#15181d">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{box-sizing:border-box;height:100%}*,*::before,*::after{box-sizing:inherit}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head><body>
+<title>KLEEM Kabelplan</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: Werkzeug-UI wie ein Gerätebaum im OB-Van – Tabs oben, Canvas füllt den Rest, Inspektor unten.
+   Systemschriften, damit die App offline ohne Nachladen gleich aussieht. */
+:root{
+  --bg:#eef0f3; --panel:#ffffff; --panel2:#f4f6f8; --line:#d3d8df; --fg:#1b2028; --muted:#5d6675;
+  --accent:#c77a12; --accent-fg:#ffffff; --danger:#c8382f; --ok:#2e9a4c; --canvas:#e4e7ec; --grid:#d3d7de;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#15181d; --panel:#1d2128; --panel2:#252a33; --line:#363c48; --fg:#e6e9ee; --muted:#8d95a3;
+  --accent:#f0a43a; --accent-fg:#1a1205; --danger:#ec5f55; --ok:#4cc96a; --canvas:#121418; --grid:#1f232a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#15181d; --panel:#1d2128; --panel2:#252a33; --line:#363c48; --fg:#e6e9ee; --muted:#8d95a3;
+  --accent:#f0a43a; --accent-fg:#1a1205; --danger:#ec5f55; --ok:#4cc96a; --canvas:#121418; --grid:#1f232a; color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:14px;-webkit-tap-highlight-color:transparent}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--panel)}
+#app{display:flex;flex-direction:column;height:100%}
+.top{display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:var(--panel);border-bottom:1px solid var(--line);
+  padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;letter-spacing:.02em}
+.logo{width:22px;height:22px;border-radius:50%;border:3px solid var(--accent);position:relative}
+.logo::after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--accent)}
+.tabs{display:flex;gap:4px;overflow-x:auto;flex:1;min-width:0}
+.tabs button{background:none;border:0;color:var(--muted);font:inherit;font-weight:600;padding:8px 12px;border-radius:8px;white-space:nowrap;cursor:pointer}
+.tabs button[aria-current="true"]{background:var(--panel2);color:var(--fg);box-shadow:inset 0 -2px 0 var(--accent)}
+main{flex:1;min-height:0;overflow:auto}
+main.fixed{overflow:hidden}
+.wrap{max-width:1100px;margin:0 auto;padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1{font-size:22px;margin:0 0 4px;text-wrap:balance}
+h2{font-size:16px;margin:0}
+.sub{color:var(--muted);margin:0 0 16px}
+.btn{display:inline-flex;align-items:center;gap:6px;font:inherit;font-weight:600;font-size:13px;color:var(--fg);background:var(--panel2);
+  border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer;white-space:nowrap;min-height:36px}
+.btn:hover{border-color:var(--muted)}
+.btn.pri{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.btn.danger{color:var(--danger)}
+.btn.sm{padding:4px 8px;min-height:28px;font-size:12px}
+.btn:disabled{opacity:.45;cursor:default}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input,select,textarea{font:inherit;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 9px;min-height:36px;max-width:100%}
+textarea{width:100%;font-family:var(--mono);font-size:13px;min-height:120px;resize:vertical}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.03em}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.spacer{flex:1}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.muted{color:var(--muted)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.pill{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.04em;padding:2px 7px;border-radius:99px;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+.pill.warn{color:var(--accent);border-color:var(--accent)}
+.sw{display:inline-block;width:22px;height:4px;border-radius:2px;vertical-align:middle}
+
+/* Plan */
+.planview{display:flex;flex-direction:column;height:100%}
+.ptools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--panel);border-bottom:1px solid var(--line);
+  padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.ptools input.pname{font-weight:700;font-size:15px;min-width:0;flex:1 1 220px;max-width:420px;background:transparent;border-color:transparent}
+.ptools input.pname:focus{border-color:var(--line);background:var(--panel)}
+.cw{position:relative;flex:1;min-height:0;background:var(--canvas)}
+#cv{position:absolute;inset:0;width:100%;height:100%;touch-action:none;user-select:none;-webkit-user-select:none;display:block}
+.legend{position:absolute;top:10px;right:max(10px,env(safe-area-inset-right,0px));background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;display:grid;gap:4px;pointer-events:none}
+.legend div{display:flex;gap:8px;align-items:center}
+.zoom{position:absolute;left:max(10px,env(safe-area-inset-left,0px));bottom:10px;display:flex;gap:4px;align-items:center}
+.zoom span{min-width:46px;text-align:center;font-size:12px;color:var(--muted)}
+.insp{background:var(--panel);border-top:1px solid var(--line);min-height:52px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+  padding-block:8px calc(8px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.insp .hint{color:var(--muted)}
+.insp b{font-weight:700}
+
+/* Tabellen */
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:var(--panel2);position:sticky;top:0}
+tr:last-child td{border-bottom:0}
+td.warn{color:var(--accent)}
+
+/* Packliste */
+.pack{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px;align-items:start}
+.pack .card{padding:14px 16px}
+.pk{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.pk:last-child{border-bottom:0}
+.pk input{width:20px;height:20px;min-height:0;accent-color:var(--accent)}
+.pk .n{width:42px;text-align:right;color:var(--muted)}
+.pk.done span{text-decoration:line-through;color:var(--muted)}
+.prog{height:6px;border-radius:3px;background:var(--panel2);overflow:hidden;margin:6px 0 16px}
+.prog i{display:block;height:100%;background:var(--ok)}
+
+/* Geräte */
+.gear{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:760px){.gear{grid-template-columns:minmax(0,1fr)}}
+.glist{max-height:70vh;overflow:auto;padding:6px}
+.gi{display:flex;gap:10px;align-items:center;padding:8px;border-radius:8px;cursor:pointer;border:1px solid transparent}
+.gi:hover{background:var(--panel2)}
+.gi[aria-current="true"]{border-color:var(--accent);background:var(--panel2)}
+.gi .chip{width:14px;height:14px;border-radius:3px;flex:none;border:1px solid var(--line)}
+.gi .t{min-width:0;flex:1}
+.gi .t div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ged{padding:16px;display:grid;gap:14px;min-width:0}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:10px}
+.prev{background:var(--canvas);border-radius:8px;overflow-x:auto;padding:10px}
+.ports{display:grid;gap:6px}
+.prow{display:grid;grid-template-columns:128px 120px 76px minmax(120px,1fr) 36px;gap:6px;align-items:center}
+@media (max-width:560px){.prow{grid-template-columns:1fr 1fr;}.prow input{grid-column:1/-1}}
+.prow select,.prow input{width:100%}
+
+/* Pläne */
+.plist{display:grid;gap:10px}
+.pl{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:14px 16px}
+.pl .t{flex:1;min-width:180px}
+.pl .t b{font-size:16px}
+
+/* Modal + Toast */
+#modal{position:fixed;inset:0;z-index:30;background:rgba(8,10,14,.55);display:flex;align-items:center;justify-content:center;
+  padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.dlg{background:var(--panel);border:1px solid var(--line);border-radius:12px;width:min(720px,100%);max-height:100%;display:flex;flex-direction:column;overflow:hidden}
+.dlg header{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.dlg .body{padding:16px;overflow:auto;display:grid;gap:14px}
+.dlg footer{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;padding:12px 16px;border-top:1px solid var(--line)}
+.alist{display:grid;gap:2px;max-height:46vh;overflow:auto}
+.ai{display:flex;align-items:center;gap:10px;padding:6px 4px;border-bottom:1px solid var(--line)}
+.ai .t{flex:1;min-width:0}
+.ai .t div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chk{display:flex;gap:8px;align-items:center;cursor:pointer}
+.chk input{width:18px;height:18px;min-height:0;accent-color:var(--accent)}
+.res{font-size:13px;display:grid;gap:4px}
+.res .w{color:var(--accent)}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:40;background:var(--fg);color:var(--bg);
+  padding:10px 16px;border-radius:10px;font-weight:600;font-size:13px;max-width:calc(100% - 32px)}
+@media (prefers-reduced-motion:no-preference){.btn{transition:border-color .15s}}
+</style>
+
+<div id="app">
+  <header class="top">
+    <div class="brand"><span class="logo" aria-hidden="true"></span>Kabelplan</div>
+    <nav class="tabs" id="tabs">
+      <button data-v="plan">Plan</button>
+      <button data-v="patches">Patches</button>
+      <button data-v="pack">Packliste</button>
+      <button data-v="gear">Geräte</button>
+      <button data-v="plans">Pläne</button>
+    </nav>
+  </header>
+  <main id="main"></main>
+</div>
+<div id="modal" hidden></div>
+<div id="toast" hidden></div>
+
+<script>
+'use strict';
+/* ---------- Grunddaten ---------- */
+const TYPES={
+  SDI:{n:'SDI',c:'#7fb2e5'}, HDMI:{n:'HDMI',c:'#a3a8b0'}, DP:{n:'DisplayPort',c:'#e0b13c'},
+  ETH:{n:'Ethernet',c:'#3d7be0'}, FIBER:{n:'Glasfaser',c:'#2fc4c0'}, USB:{n:'USB',c:'#d665e0'},
+  XLR:{n:'XLR',c:'#4cc96a'}, SERIAL:{n:'Seriell',c:'#c98b4c'}, POWER:{n:'Strom',c:'#e05a4c'}, CUSTOM:{n:'Sonstige',c:'#c9c9c9'}
+};
+const LEVELS=['','12G','6G','3G','HD','Ref'];
+const LV={'12G':4,'6G':3,'3G':2,'HD':1,'':2};
+const CATS=['Kamera','Zuspieler','Computer','Kreuzschiene','Bildmischer','Monitor','Konverter','Netzwerk','Audiomischer','Stagebox','Steuerung','Sonstiges'];
+const DIRS={in:'Eingang',out:'Ausgang',io:'Bidirektional'};
+const PW=46, PH=16, BODY=36, BH=PH*2+BODY;
+
+const uid=()=>Math.random().toString(36).slice(2,10);
+const clone=o=>JSON.parse(JSON.stringify(o));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm=s=>String(s).toLowerCase().replace(/[^a-z0-9]/g,'');
+const $=s=>document.querySelector(s);
+
+function G(name,mfr,cat,color,spec){
+  const ports=[];
+  spec.trim().split('\n').forEach(l=>{
+    const [h,nm]=l.split('|').map(s=>s.trim());
+    const t=h.split(/\s+/); const dir=t[0],type=t[1],level=t[2]||'';
+    const m=nm.match(/^(.*?)(\d+)-(\d+)$/);
+    if(m){for(let i=+m[2];i<=+m[3];i++)ports.push({id:uid(),name:m[1]+i,dir,type,level});}
+    else ports.push({id:uid(),name:nm,dir,type,level});
+  });
+  return {id:uid(),name,mfr,cat,color,ports,verify:true};
+}
+function defaultLib(){return[
+ G('AW-UE160','Panasonic','Kamera','#f2d03b',`
+in SDI Ref | Genlock In
+in XLR | Audio In 1-2
+io ETH | LAN (PoE++)
+out SDI 12G | 12G-SDI Out
+out SDI 3G | 3G-SDI Out
+out HDMI | HDMI Out`),
+ G('Videohub 40x40 12G','Blackmagic Design','Kreuzschiene','#23272e',`
+in SDI 12G | In 1-40
+in SDI Ref | Ref In
+io ETH | Ethernet
+out SDI 12G | Out 1-40`),
+ G('Kairos AT-KC200','Panasonic','Bildmischer','#2a43d6',`
+in SDI 12G | 12G SDI In 1-16
+in SDI 3G | 3G SDI In 17-24
+io ETH | Ethernet
+out SDI 12G | 12G SDI Out 1-16
+out SDI Ref | Ref Out
+out DP | MV DP 1-4`),
+ G('Blackmagic Media Player 10G','Blackmagic Design','Zuspieler','#f5b42a',`
+in SDI 12G | 12G-SDI In
+in USB | USB-C
+io ETH | Ethernet 10G
+out SDI 12G | 12G-SDI Out 1-4
+out HDMI | HDMI Out
+out XLR | Analog L
+out XLR | Analog R`),
+ G('Lilliput BM280-4KS','Lilliput','Monitor','#2b2f36',`
+in HDMI | HDMI 1-4
+in CUSTOM | DVI
+in CUSTOM | VGA
+in SDI 3G | 3G-SDI In
+out SDI 3G | 3G-SDI Loop`),
+ G('Lilliput BM280-12G 28"','Lilliput','Monitor','#2b2f36',`
+in SDI 12G | 12G-SDI In 1-2
+in SDI 3G | 3G-SDI In 3-4
+in HDMI | HDMI In
+out SDI 12G | 12G Loop 1-2
+out SDI 3G | 3G Loop 3-4`),
+ G('ProLite X4373UHSU-B1 42.5"','iiyama','Monitor','#1fc79a',`
+in DP | DisplayPort
+in DP | Mini-DP
+in HDMI | HDMI 1-2
+out DP | DP Out`),
+ G('DM3','Yamaha','Audiomischer','#b7c0cc',`
+in XLR | In 1-16
+io ETH | Dante
+io USB | USB
+out XLR | Out 1-8`),
+ G('Tio1608-D2','Yamaha','Stagebox','#8f9aab',`
+in XLR | In 1-16
+io ETH | Dante Primary
+io ETH | Dante Secondary
+out XLR | Out 1-8`),
+ G('M4350-24X4V','NETGEAR','Netzwerk','#2833d6',`
+io ETH | Port 1-24
+io FIBER | SFP28 1-4`),
+ G('M4350-16V4C','NETGEAR','Netzwerk','#2833d6',`
+io ETH | Port 1-16
+io FIBER | SFP28 1-4`),
+ G('Laptop Timer/PPT/Companion','','Computer','#b3b6bb',`
+io USB | USB-C 1-2
+io USB | USB-A
+io ETH | Ethernet
+out HDMI | HDMI Out 1-2`),
+ G('USB 3.2 Matrix 4x4 (IP)','','Kreuzschiene','#2337e0',`
+in USB | USB In 1-4
+io ETH | Ethernet
+out USB | USB Out 1-4`),
+ G('PerfectCue Mini','DSAN','Steuerung','#e540e5',`
+out USB | USB Out 1-2`),
+ G('USB-C auf Stereo XLR','','Konverter','#f25c54',`
+in USB | USB-C
+out XLR | XLR L
+out XLR | XLR R`),
+ G('Fusion 6B 2xHDMI In','','Konverter','#c81d25',`
+in HDMI | HDMI In 1-2
+io ETH | Ethernet
+out FIBER | SFP`),
+ G('AW-RP150','Panasonic','Steuerung','#a020f0',`
+io ETH | LAN
+out CUSTOM | Tally/GPIO`),
+ G('Generisches SDI-Gerät','','Sonstiges','#9aa1ab',`
+in SDI 3G | SDI In
+out SDI 3G | SDI Out`)
+];}
+
+/* ---------- Zustand ---------- */
+const LS='kleem-kabelplan-v1';
+let S=null;
+function load(){
+  try{const r=localStorage.getItem(LS); if(r)S=JSON.parse(r);}catch(e){}
+  if(!S||!Array.isArray(S.lib)||!Array.isArray(S.plans))S=fresh();
+  if(!S.plans.length){const p=newPlan('Neuer Plan');S.plans.push(p);S.cur=p.id;}
+  if(!S.plans.find(p=>p.id===S.cur))S.cur=S.plans[0].id;
+  S.view=S.view||'plan';
+}
+function fresh(){
+  const lib=defaultLib(); const st={lib,plans:[],cur:null,view:'plan'}; S=st;
+  const p=newPlan('Beispiel: Studio 4 Kameras'); p.example=true;
+  [['Kairos AT-KC200',1],['Videohub 40x40 12G',1],['AW-UE160',4],['Blackmagic Media Player 10G',3],['Lilliput BM280-4KS',2],
+   ['Lilliput BM280-12G 28"',2],['ProLite X4373UHSU-B1 42.5"',4],['DM3',1],['Tio1608-D2',1],['M4350-24X4V',1],['M4350-16V4C',1],
+   ['Laptop Timer/PPT/Companion',1],['USB 3.2 Matrix 4x4 (IP)',1],['PerfectCue Mini',1],['USB-C auf Stereo XLR',4],['Fusion 6B 2xHDMI In',2],['AW-RP150',1]
+  ].forEach(([n,c])=>{const g=lib.find(x=>x.name===n); for(let i=0;i<c;i++)addItem(p,g);});
+  autowire(p,{replace:true,video:true,net:true,usb:true,audio:true}); layout(p);
+  st.plans.push(p); st.cur=p.id; return st;
+}
+let saveT; function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){toast('Speichern im Browser nicht möglich')}},250);}
+const plan=()=>S.plans.find(p=>p.id===S.cur);
+function newPlan(name){return{id:uid(),name,created:new Date().toISOString().slice(0,10),items:[],cables:[],packed:{}};}
+const getItem=(p,id)=>p.items.find(i=>i.id===id);
+const getPort=(it,pid)=>it&&it.gear.ports.find(p=>p.id===pid);
+
+function addItem(p,g,x,y){
+  const same=p.items.filter(i=>i.gearId===g.id).length;
+  const camN=p.items.filter(i=>i.gear.cat==='Kamera').length;
+  const label=g.cat==='Kamera'?'CAM '+(camN+1):g.name+(same?' #'+(same+1):'');
+  if(same===1&&g.cat!=='Kamera'){const first=p.items.find(i=>i.gearId===g.id); if(first.label===g.name)first.label=g.name+' #1';}
+  const it={id:uid(),gearId:g.id,label,gear:clone(g),x:x??0,y:y??0};
+  p.items.push(it); return it;
+}
+
+/* ---------- Geometrie ---------- */
+function geom(g){
+  const top=g.ports.filter(p=>p.dir!=='out'), bot=g.ports.filter(p=>p.dir==='out');
+  const n=Math.max(top.length,bot.length,3); return {w:Math.max(150,n*PW),h:BH,top,bot};
+}
+function portPos(it,pid){
+  const g=geom(it.gear); let i=g.top.findIndex(p=>p.id===pid);
+  if(i>=0)return{x:it.x+(i+.5)*g.w/g.top.length,y:it.y,d:'up'};
+  i=g.bot.findIndex(p=>p.id===pid);
+  return{x:it.x+(i+.5)*g.w/g.bot.length,y:it.y+BH,d:'down'};
+}
+function txtColor(hex){const h=hex.replace('#','');if(h.length<6)return'#111';const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);return (0.299*r+0.587*g+0.114*b)/255>0.58?'#14171c':'#ffffff';}
+function short(s,w){const n=Math.max(3,Math.floor(w/5.1));return s.length>n?s.slice(0,n-1)+'…':s;}
+
+function blockSVG(g,x,y,o={}){
+  const G_=geom(g), used=o.used||new Set(), sel=o.sel, id=o.id||'';
+  const tc=txtColor(g.color);
+  let s=`<g ${id?`data-item="${id}"`:''}>`;
+  s+=`<rect x="${x}" y="${y}" width="${G_.w}" height="${BH}" rx="4" fill="#f2f4f7" stroke="${sel?'var(--accent)':'#0006'}" stroke-width="${sel?3:1}"/>`;
+  s+=`<rect x="${x}" y="${y+PH}" width="${G_.w}" height="${BODY}" fill="${g.color}"/>`;
+  s+=`<text x="${x+G_.w/2}" y="${y+PH+16}" text-anchor="middle" font-family="${'-apple-system,Segoe UI,Arial,sans-serif'}" font-size="11" font-weight="700" fill="${tc}">${esc((o.label||g.name).toUpperCase())}</text>`;
+  s+=`<text x="${x+G_.w/2}" y="${y+PH+28}" text-anchor="middle" font-family="-apple-system,Segoe UI,Arial,sans-serif" font-size="8" fill="${tc}" opacity=".8">${esc((o.label&&o.label!==g.name?g.name:(g.mfr||g.cat)).toUpperCase())}</text>`;
+  const cell=(p,i,n,yy)=>{
+    const cw=G_.w/n, cx=x+i*cw, k=(id||'')+':'+p.id, u=used.has(k), ps=o.pend===k;
+    const lvl=p.type==='SDI'&&p.level?p.level+' ':'';
+    let c=`<g ${id?`data-port="${k}"`:''}><title>${esc(p.name)} · ${esc(lvl)}${TYPES[p.type].n} · ${DIRS[p.dir]}</title>`;
+    c+=`<rect x="${cx+.5}" y="${yy+.5}" width="${cw-1}" height="${PH-1}" fill="${ps?'#f0a43a':(u?'#ffffff':'#dfe3e8')}" stroke="#0002"/>`;
+    const sy=yy===y?yy+1:yy+PH-3; c+=`<rect x="${cx+1}" y="${sy}" width="${cw-2}" height="2" fill="${TYPES[p.type].c}"/>`;
+    c+=`<text x="${cx+cw/2}" y="${yy+11}" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="7.5" fill="${u?'#14171c':'#59616e'}">${esc(short((p.dir==='io'?'↔':'')+p.name,cw))}</text></g>`;
+    return c;
+  };
+  G_.top.forEach((p,i)=>s+=cell(p,i,G_.top.length,y));
+  G_.bot.forEach((p,i)=>s+=cell(p,i,G_.bot.length,y+PH+BODY));
+  return s+'</g>';
+}
+
+function cablePath(a,b,lane){
+  const s=14;
+  if(a.d==='up'&&b.d==='down'){const t=a;a=b;b=t;}
+  if(a.d==='down'&&b.d==='up'){
+    const y1=a.y+s,y2=b.y-s;
+    if(y2>y1){const my=(y1+y2)/2+lane;return`M${a.x} ${a.y}V${my}H${b.x}V${b.y}`;}
+    const mx=(a.x+b.x)/2+lane*2;return`M${a.x} ${a.y}V${y1+Math.abs(lane)}H${mx}V${y2-Math.abs(lane)}H${b.x}V${b.y}`;
+  }
+  if(a.d==='up'){const y=Math.min(a.y,b.y)-s-Math.abs(lane)*2-6;return`M${a.x} ${a.y}V${y}H${b.x}V${b.y}`;}
+  const y=Math.max(a.y,b.y)+s+Math.abs(lane)*2+6;return`M${a.x} ${a.y}V${y}H${b.x}V${b.y}`;
+}
+
+/* ---------- Auto-Verkabelung ---------- */
+function levelWarn(o,i,fromCat){
+  if(o.type!=='SDI'||i.type!=='SDI'||fromCat==='Kreuzschiene')return'';
+  if(o.level==='Ref'||i.level==='Ref'||!o.level||!i.level)return'';
+  return LV[o.level]>LV[i.level]?`${o.level}-Ausgang auf ${i.level}-Eingang – Signalformat prüfen`:'';
+}
+function autowire(p,opt){
+  const log=[],warn=[];
+  const before=p.cables.length;
+  if(opt.replace)p.cables=p.cables.filter(c=>!c.auto);
+  const removed=before-p.cables.length;
+  const used=new Set();p.cables.forEach(c=>{used.add(c.from.item+':'+c.from.port);used.add(c.to.item+':'+c.to.port);});
+  const its=p.items, k=(i,pt)=>i.id+':'+pt.id;
+  const free=(i,dirs,type,f)=>i.gear.ports.filter(pt=>dirs.includes(pt.dir)&&pt.type===type&&!used.has(k(i,pt))&&(!f||f(pt)));
+  let made=0;
+  const link=(a,pa,b,pb,note)=>{
+    used.add(k(a,pa));used.add(k(b,pb));
+    const c={id:uid(),from:{item:a.id,port:pa.id},to:{item:b.id,port:pb.id},type:pa.type,auto:true};
+    if(note)c.note=note; const w=levelWarn(pa,pb,a.gear.cat); if(w){c.warn=w;warn.push(`${a.label} ${pa.name} → ${b.label} ${pb.name}: ${w}`);}
+    p.cables.push(c);made++;return c;
+  };
+  const cat=c=>its.filter(i=>i.gear.cat===c);
+  const sig=pt=>pt.level!=='Ref';
+  const best=l=>l.slice().sort((a,b)=>(LV[b.level]??2)-(LV[a.level]??2))[0];
+  const pickIn=(l,lvl)=>l.find(pt=>(LV[pt.level]??2)>=(LV[lvl]??2))||l[0];
+  const hasType=(i,t)=>p.cables.some(c=>c.type===t&&(c.from.item===i.id||c.to.item===i.id));
+
+  const sdiIns=i=>i.gear.ports.filter(pt=>pt.dir==='in'&&pt.type==='SDI'&&sig(pt)).length;
+  const R=cat('Kreuzschiene').filter(i=>sdiIns(i)>0).sort((a,b)=>sdiIns(b)-sdiIns(a))[0];
+  const M=cat('Bildmischer')[0];
+  const fed=new Set(); p.cables.forEach(c=>{const t=getItem(p,c.to.item);if(t&&t.gear.cat==='Monitor')fed.add(t.id);});
+
+  if(opt.video){
+    const target=R||M; let nSrc=0;
+    if(target){
+      its.filter(i=>['Kamera','Zuspieler','Computer','Konverter','Sonstiges'].includes(i.gear.cat)&&i!==target).forEach(i=>{
+        const o=best(free(i,['out'],'SDI',sig)); if(!o)return;
+        const pin=pickIn(free(target,['in'],'SDI',sig),o.level);
+        if(pin){link(i,o,target,pin);nSrc++;} else warn.push(`${target.label}: keine freien SDI-Eingänge mehr für ${i.label}`);
+      });
+      if(nSrc)log.push(`${nSrc} Quellen auf ${target.label}`);
+    }
+    if(R&&M){
+      let n=0;
+      for(let q=0;q<nSrc;q++){const o=free(R,['out'],'SDI',sig)[0];const pin=o&&pickIn(free(M,['in'],'SDI',sig),o.level);if(!o||!pin)break;link(R,o,M,pin);n++;}
+      if(n)log.push(`${n} Kreuzschienen-Ausgänge auf ${M.label}`);
+      let r=0; free(M,['out'],'SDI',sig).slice(0,4).forEach(o=>{const pin=pickIn(free(R,['in'],'SDI',sig),o.level);if(pin){link(M,o,R,pin,'Rückführung');r++;}});
+      if(r)log.push(`${r} Mischer-Ausgänge zurück in die Kreuzschiene`);
+    }
+    const feed=R||M;
+    if(feed){let n=0;cat('Monitor').forEach(m=>{if(fed.has(m.id))return;const ins=free(m,['in'],'SDI',sig);if(!ins.length)return;const o=free(feed,['out'],'SDI',sig)[0];if(!o){warn.push(`${feed.label}: keine freien SDI-Ausgänge für ${m.label}`);return;}link(feed,o,m,pickIn(ins,o.level));fed.add(m.id);n++;});if(n)log.push(`${n} Monitore per SDI`);}
+    // Referenz
+    const rIns=[];its.forEach(i=>free(i,['in'],'SDI',pt=>pt.level==='Ref').forEach(pt=>rIns.push([i,pt])));
+    rIns.sort((a,b)=>(b[0]===R)-(a[0]===R)||(b[0].gear.cat==='Kreuzschiene')-(a[0].gear.cat==='Kreuzschiene'));
+    its.forEach(i=>free(i,['out'],'SDI',pt=>pt.level==='Ref').forEach(o=>{const t=rIns.find(([j,pt])=>j!==i&&!used.has(k(j,pt)));if(t){link(i,o,t[0],t[1],'Referenz');log.push(`Referenz ${i.label} → ${t[0].label}`);}}));
+    const gl=rIns.filter(([j,pt])=>!used.has(k(j,pt))&&j.gear.cat==='Kamera').length;
+    if(gl)warn.push(`${gl} Kamera-Genlock-Eingänge ohne Referenz – Taktgenerator oder Ref-Verteiler einplanen`);
+    // Multiviewer & HDMI
+    let mv=0;
+    [M,R].filter(Boolean).forEach(src=>['DP','HDMI'].forEach(t=>cat('Monitor').forEach(m=>{if(fed.has(m.id))return;const ins=free(m,['in'],t);const o=free(src,['out'],t)[0];if(ins.length&&o){link(src,o,m,ins[0]);fed.add(m.id);mv++;}})));
+    if(mv)log.push(`${mv} Monitore am Multiviewer`);
+    let hd=0;
+    cat('Computer').forEach(pc=>free(pc,['out'],'HDMI').forEach(o=>{
+      const cv=cat('Konverter').find(c=>free(c,['in'],'HDMI').length);
+      if(cv){link(pc,o,cv,free(cv,['in'],'HDMI')[0]);hd++;return;}
+      const m=cat('Monitor').find(m=>!fed.has(m.id)&&free(m,['in'],'HDMI').length);
+      if(m){link(pc,o,m,free(m,['in'],'HDMI')[0]);fed.add(m.id);hd++;}
+    }));
+    if(hd)log.push(`${hd} HDMI-Verbindungen von Computern`);
+  }
+  if(opt.usb){
+    const X=cat('Kreuzschiene').find(i=>i.gear.ports.some(pt=>pt.type==='USB'&&pt.dir==='in'));
+    let n=0;
+    cat('Steuerung').forEach(c=>{const o=free(c,['out'],'USB')[0];if(!o)return;
+      if(X){const pin=free(X,['in'],'USB')[0];if(pin){link(c,o,X,pin);n++;}}
+      else{const pc=cat('Computer').find(pc=>free(pc,['io','in'],'USB').length);if(pc){link(c,o,pc,free(pc,['io','in'],'USB')[0]);n++;}}});
+    if(X)cat('Computer').forEach(pc=>{const o=free(X,['out'],'USB')[0];const l=free(pc,['io','in'],'USB');const pin=l.find(pt=>/usb-?a/i.test(pt.name))||l[l.length-1];if(o&&pin){link(X,o,pc,pin);n++;}});
+    cat('Konverter').filter(a=>free(a,['in'],'USB').length&&a.gear.ports.some(pt=>pt.type==='XLR'&&pt.dir==='out')).forEach(a=>{
+      const pc=[...cat('Computer'),...cat('Zuspieler')].find(i=>free(i,['io','out'],'USB',pt=>/usb-?c/i.test(pt.name)).length);
+      if(pc){link(pc,free(pc,['io','out'],'USB',pt=>/usb-?c/i.test(pt.name))[0],a,free(a,['in'],'USB')[0]);n++;}
+      else warn.push(`${a.label}: kein freier USB-C-Anschluss an einem Computer`);
+    });
+    if(n)log.push(`${n} USB-Verbindungen`);
+  }
+  if(opt.audio){
+    const mix=cat('Audiomischer')[0]||cat('Stagebox')[0]; let n=0;
+    if(mix)its.filter(i=>!['Audiomischer','Stagebox'].includes(i.gear.cat)).forEach(i=>{
+      const outs=free(i,['out'],'XLR'); if(!outs.length)return;
+      if(i.gear.cat==='Konverter'&&i.gear.ports.some(pt=>pt.type==='USB'&&pt.dir==='in')&&!hasType(i,'USB'))return;
+      outs.forEach(o=>{const pin=free(mix,['in'],'XLR')[0];if(pin){link(i,o,mix,pin);n++;}else warn.push(`${mix.label}: keine freien XLR-Eingänge für ${i.label} ${o.name}`);});
+    });
+    if(n)log.push(`${n} Audioleitungen auf ${mix.label}`);
+  }
+  if(opt.net){
+    const sw=cat('Netzwerk');
+    if(sw.length){
+      let n=0;
+      for(let q=1;q<sw.length;q++){
+        const a=sw[q-1],b=sw[q];
+        const fa=free(a,['io'],'FIBER')[0],fb=free(b,['io'],'FIBER')[0];
+        if(fa&&fb)link(a,fa,b,fb,'Uplink');else{const ea=free(a,['io'],'ETH')[0],eb=free(b,['io'],'ETH')[0];if(ea&&eb)link(a,ea,b,eb,'Uplink');}
+      }
+      its.filter(i=>i.gear.cat==='Konverter').forEach(i=>free(i,['out','io'],'FIBER').forEach(o=>{
+        const s=sw.find(s=>free(s,['io','in'],'FIBER').length);
+        if(s){link(i,o,s,free(s,['io','in'],'FIBER')[0],'IP-Video');n++;}else warn.push(`Keine freien SFP-Ports für ${i.label}`);
+      }));
+      its.filter(i=>i.gear.cat!=='Netzwerk').forEach(i=>{
+        if(hasType(i,'ETH'))return;
+        const ps=free(i,['io','in','out'],'ETH'); if(!ps.length)return;
+        const pt=ps.find(x=>/dante|primary/i.test(x.name))||ps[0];
+        const s=sw.find(s=>free(s,['io','in'],'ETH').length);
+        if(!s){warn.push(`Switch-Ports voll – ${i.label} nicht im Netz`);return;}
+        link(i,pt,s,free(s,['io','in'],'ETH')[0]);n++;
+      });
+      if(n)log.push(`${n} Netzwerkverbindungen`);
+      const sec=its.filter(i=>i.gear.ports.some(pt=>/secondary/i.test(pt.name)&&!used.has(k(i,pt)))).length;
+      if(sec)warn.push(`${sec} Dante-Secondary-Ports frei – für Redundanz ein zweites Netz einplanen`);
+    }
+  }
+  const lonely=its.filter(i=>!p.cables.some(c=>c.from.item===i.id||c.to.item===i.id));
+  lonely.forEach(i=>warn.push(`${i.label} hat keine Verbindung`));
+  return{made,removed,log,warn};
+}
+
+/* ---------- Anordnen ---------- */
+function layout(p){
+  const ids=p.items.map(i=>i.id), rank={}; ids.forEach(id=>rank[id]=0);
+  const vid=c=>['SDI','HDMI','DP'].includes(c.type)&&!['Rückführung','Referenz'].includes(c.note);
+  const edges=p.cables.filter(vid).map(c=>[c.from.item,c.to.item]);
+  for(let q=0;q<ids.length;q++){let ch=false;edges.forEach(([a,b])=>{if(rank[b]<rank[a]+1&&rank[a]+1<=ids.length){rank[b]=rank[a]+1;ch=true;}});if(!ch)break;}
+  const inVid=new Set(edges.flat());
+  const group=i=>{const c=i.gear.cat;
+    if(c==='Netzwerk')return'net';
+    if(c==='Audiomischer'||c==='Stagebox')return'audio';
+    if(inVid.has(i.id)||['Kamera','Zuspieler','Bildmischer','Monitor'].includes(c))return'vid';
+    if(i.gear.ports.some(pt=>pt.type==='XLR'&&pt.dir==='out'))return'audio';
+    return'ctrl';};
+  const rows={};
+  p.items.forEach(i=>{const g=group(i);const key=g==='vid'?'v'+String(rank[i.id]).padStart(3,'0'):{ctrl:'x1',audio:'x2',net:'x3'}[g];(rows[key]??=[]).push(i);});
+  const ord=i=>CATS.indexOf(i.gear.cat);
+  Object.keys(rows).sort().forEach((r,ri)=>{
+    const row=rows[r].sort((a,b)=>ord(a)-ord(b)||a.label.localeCompare(b.label,'de',{numeric:true}));
+    const gap=40,ws=row.map(i=>geom(i.gear).w),tot=ws.reduce((s,w)=>s+w,0)+gap*(row.length-1);
+    let x=-tot/2; row.forEach((i,j)=>{i.x=Math.round(x/10)*10;i.y=ri*230;x+=ws[j]+gap;});
+  });
+}
+
+/* ---------- Plan-Ansicht ---------- */
+let view={x:0,y:0,k:.5},sel=null,pend=null,fitPending=true;
+function renderPlan(){
+  const p=plan(); const m=$('#main'); m.className='fixed';
+  m.innerHTML=`<section class="planview">
+   <div class="ptools">
+     <input class="pname" id="pname" value="${esc(p.name)}" aria-label="Planname">
+     ${p.example?'<span class="pill warn">Beispiel</span>':''}
+     <span class="spacer"></span>
+     <button class="btn pri" id="bAdd">Geräte hinzufügen</button>
+     <button class="btn" id="bAuto">Auto-Verkabelung</button>
+     <button class="btn" id="bLay">Anordnen</button>
+     <button class="btn" id="bSvg">Als Bild</button>
+   </div>
+   <div class="cw" id="cw">
+     <svg id="cv" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="gp" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="var(--grid)" stroke-width="1"/></pattern></defs>
+       <rect id="bg" width="100%" height="100%" fill="url(#gp)"/><g id="world"></g></svg>
+     <div class="legend" id="legend"></div>
+     <div class="zoom"><button class="btn sm" id="zOut" aria-label="Verkleinern">−</button><span id="zLbl"></span><button class="btn sm" id="zIn" aria-label="Vergrößern">+</button><button class="btn sm" id="zFit">Einpassen</button></div>
+   </div>
+   <div class="insp" id="insp"></div></section>`;
+  $('#pname').oninput=e=>{p.name=e.target.value;save();};
+  $('#bAdd').onclick=openAdd; $('#bAuto').onclick=openAuto;
+  $('#bLay').onclick=()=>{layout(p);save();drawCanvas();fit();toast('Neu angeordnet');};
+  $('#bSvg').onclick=exportSvg;
+  $('#zIn').onclick=()=>zoomAt(1.25); $('#zOut').onclick=()=>zoomAt(.8); $('#zFit').onclick=fit;
+  bindCanvas(); drawCanvas();
+  if(fitPending){fit();fitPending=false;}else applyView();
+}
+function drawCanvas(){
+  const p=plan(); const w=$('#world'); if(!w)return;
+  const used=new Set();p.cables.forEach(c=>{used.add(c.from.item+':'+c.from.port);used.add(c.to.item+':'+c.to.port);});
+  let cs='',hs='';
+  p.cables.forEach((c,idx)=>{
+    const a=getItem(p,c.from.item),b=getItem(p,c.to.item);if(!a||!b)return;
+    const pa=portPos(a,c.from.port),pb=portPos(b,c.to.port);
+    const d=cablePath(pa,pb,((idx*7)%13-6)*3);
+    const s=sel&&sel.kind==='cable'&&sel.id===c.id;
+    cs+=`<path d="${d}" fill="none" stroke="${TYPES[c.type].c}" stroke-width="${s?3.5:1.5}" ${c.warn?'stroke-dasharray="6 3"':''} opacity="${sel&&sel.kind==='cable'&&!s?.45:1}"/>`;
+    hs+=`<path data-cable="${c.id}" d="${d}" fill="none" stroke="transparent" stroke-width="12"/>`;
+  });
+  let bs='';
+  p.items.forEach(it=>{bs+=blockSVG(it.gear,it.x,it.y,{id:it.id,used,label:it.label,sel:sel&&sel.kind==='item'&&sel.id===it.id,pend:pend?pend.item+':'+pend.port:null});});
+  w.innerHTML=`<g>${cs}</g><g>${bs}</g><g>${hs}</g>`;
+  const ts=[...new Set(p.cables.map(c=>c.type))];
+  const lg=$('#legend'); lg.hidden=!ts.length;
+  lg.innerHTML=ts.map(t=>`<div><span class="sw" style="background:${TYPES[t].c}"></span>${TYPES[t].n}</div>`).join('');
+  drawInsp();
+}
+function applyView(){const w=$('#world');if(w)w.setAttribute('transform',`translate(${view.x} ${view.y}) scale(${view.k})`);const l=$('#zLbl');if(l)l.textContent=Math.round(view.k*100)+'%';}
+function bbox(p){if(!p.items.length)return{x:0,y:0,w:400,h:300};let x1=1e9,y1=1e9,x2=-1e9,y2=-1e9;p.items.forEach(i=>{const g=geom(i.gear);x1=Math.min(x1,i.x);y1=Math.min(y1,i.y);x2=Math.max(x2,i.x+g.w);y2=Math.max(y2,i.y+BH);});return{x:x1-60,y:y1-80,w:x2-x1+120,h:y2-y1+160};}
+function fit(){const cw=$('#cw');if(!cw)return;const r=cw.getBoundingClientRect(),b=bbox(plan());view.k=Math.min(2,Math.max(.08,Math.min(r.width/b.w,r.height/b.h)));view.x=(r.width-b.w*view.k)/2-b.x*view.k;view.y=(r.height-b.h*view.k)/2-b.y*view.k;applyView();}
+function zoomAt(f,cx,cy){const r=$('#cw').getBoundingClientRect();cx??=r.width/2;cy??=r.height/2;const k=Math.min(3,Math.max(.06,view.k*f));const wx=(cx-view.x)/view.k,wy=(cy-view.y)/view.k;view.k=k;view.x=cx-wx*k;view.y=cy-wy*k;applyView();}
+
+function bindCanvas(){
+  const svg=$('#cv'); const ptrs=new Map(); let drag=null,pinch=null,raf=0;
+  const rel=e=>{const r=svg.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};};
+  svg.addEventListener('pointerdown',e=>{
+    try{svg.setPointerCapture(e.pointerId);}catch(_){}
+    ptrs.set(e.pointerId,rel(e));
+    if(ptrs.size===2){drag=null;const[a,b]=[...ptrs.values()];pinch={d:Math.hypot(a.x-b.x,a.y-b.y),k:view.k,c:{x:(a.x+b.x)/2,y:(a.y+b.y)/2},vx:view.x,vy:view.y};return;}
+    const t=e.target.closest('[data-port],[data-item],[data-cable]');
+    const pos=rel(e);
+    drag={s:pos,t,moved:false,kind:(t&&t.dataset.item&&!t.dataset.port)?'item':'pan',vx:view.x,vy:view.y};
+    if(drag.kind==='item'){const it=getItem(plan(),t.dataset.item);drag.it=it;drag.ox=it.x;drag.oy=it.y;}
+  });
+  svg.addEventListener('pointermove',e=>{
+    if(!ptrs.has(e.pointerId))return; const pos=rel(e); ptrs.set(e.pointerId,pos);
+    if(pinch&&ptrs.size>=2){const[a,b]=[...ptrs.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);const k=Math.min(3,Math.max(.06,pinch.k*d/pinch.d));
+      const c={x:(a.x+b.x)/2,y:(a.y+b.y)/2};const wx=(pinch.c.x-pinch.vx)/pinch.k,wy=(pinch.c.y-pinch.vy)/pinch.k;view.k=k;view.x=c.x-wx*k;view.y=c.y-wy*k;applyView();return;}
+    if(!drag)return; const dx=pos.x-drag.s.x,dy=pos.y-drag.s.y;
+    if(!drag.moved&&Math.hypot(dx,dy)>6)drag.moved=true;
+    if(!drag.moved)return;
+    if(drag.kind==='item'){drag.it.x=drag.ox+dx/view.k;drag.it.y=drag.oy+dy/view.k;if(!raf)raf=requestAnimationFrame(()=>{raf=0;drawCanvas();});}
+    else{view.x=drag.vx+dx;view.y=drag.vy+dy;applyView();}
+  });
+  const end=e=>{
+    ptrs.delete(e.pointerId);
+    if(pinch){if(ptrs.size<2)pinch=null;drag=null;return;}
+    if(!drag)return;
+    if(!drag.moved)tap(drag.t);
+    else if(drag.kind==='item'){drag.it.x=Math.round(drag.it.x/10)*10;drag.it.y=Math.round(drag.it.y/10)*10;save();drawCanvas();}
+    drag=null;
+  };
+  svg.addEventListener('pointerup',end); svg.addEventListener('pointercancel',end);
+  svg.addEventListener('wheel',e=>{e.preventDefault();const r=rel(e);zoomAt(Math.exp(-e.deltaY*.0015),r.x,r.y);},{passive:false});
+}
+function tap(t){
+  if(!t){sel=null;pend=null;drawCanvas();return;}
+  if(t.dataset.port){const[iid,pid]=t.dataset.port.split(':');onPort(iid,pid);return;}
+  if(t.dataset.cable){sel={kind:'cable',id:t.dataset.cable};pend=null;}
+  else if(t.dataset.item){sel={kind:'item',id:t.dataset.item};}
+  drawCanvas();
+}
+function onPort(iid,pid){
+  const p=plan(),it=getItem(p,iid),pt=getPort(it,pid);
+  const c=p.cables.find(c=>(c.from.item===iid&&c.from.port===pid)||(c.to.item===iid&&c.to.port===pid));
+  if(!pend){if(c){sel={kind:'cable',id:c.id};}else{pend={item:iid,port:pid};sel=null;}drawCanvas();return;}
+  if(pend.item===iid&&pend.port===pid){pend=null;drawCanvas();return;}
+  if(c){toast(`${pt.name} ist schon belegt`);return;}
+  const a=getItem(p,pend.item),pa=getPort(a,pend.port);
+  if(a===it){toast('Bitte einen Anschluss an einem anderen Gerät wählen');return;}
+  let from,to;
+  if(pa.dir==='out'&&pt.dir!=='out'){from=[a,pa];to=[it,pt];}
+  else if(pt.dir==='out'&&pa.dir!=='out'){from=[it,pt];to=[a,pa];}
+  else if(pa.dir==='io'){from=[a,pa];to=[it,pt];}
+  else if(pt.dir==='io'){from=[it,pt];to=[a,pa];}
+  else{toast(pa.dir==='in'?'Zwei Eingänge lassen sich nicht verbinden':'Zwei Ausgänge lassen sich nicht verbinden');return;}
+  if(pa.type!==pt.type){toast(`${TYPES[pa.type].n} passt nicht auf ${TYPES[pt.type].n}`);return;}
+  const nc={id:uid(),from:{item:from[0].id,port:from[1].id},to:{item:to[0].id,port:to[1].id},type:pa.type,auto:false};
+  const w=levelWarn(from[1],to[1],from[0].gear.cat);if(w){nc.warn=w;toast(w);}
+  p.cables.push(nc);pend=null;sel={kind:'cable',id:nc.id};save();drawCanvas();
+}
+function cableText(p,c){const a=getItem(p,c.from.item),b=getItem(p,c.to.item);return{a,b,pa:getPort(a,c.from.port),pb:getPort(b,c.to.port)};}
+function drawInsp(){
+  const el=$('#insp');if(!el)return;const p=plan();
+  if(pend){const it=getItem(p,pend.item),pt=getPort(it,pend.port);
+    el.innerHTML=`<span><b>${esc(it.label)}</b> · ${esc(pt.name)} <span class="pill">${TYPES[pt.type].n}${pt.level?' '+pt.level:''}</span></span><span class="hint">Jetzt den Gegenanschluss am Zielgerät tippen.</span><span class="spacer"></span><button class="btn sm" id="iX">Abbrechen</button>`;
+    $('#iX').onclick=()=>{pend=null;drawCanvas();};return;}
+  if(sel&&sel.kind==='cable'){const c=p.cables.find(c=>c.id===sel.id);if(!c){sel=null;return drawInsp();}const t=cableText(p,c);
+    el.innerHTML=`<span class="sw" style="background:${TYPES[c.type].c}"></span><span><b>${esc(t.a.label)}</b> ${esc(t.pa.name)} → <b>${esc(t.b.label)}</b> ${esc(t.pb.name)}</span>${c.note?`<span class="pill">${esc(c.note)}</span>`:''}${c.auto?'<span class="pill">Auto</span>':''}${c.warn?`<span class="pill warn">${esc(c.warn)}</span>`:''}<span class="spacer"></span><button class="btn sm danger" id="iDel">Kabel entfernen</button>`;
+    $('#iDel').onclick=()=>{p.cables=p.cables.filter(x=>x.id!==c.id);sel=null;save();drawCanvas();};return;}
+  if(sel&&sel.kind==='item'){const it=getItem(p,sel.id);if(!it){sel=null;return drawInsp();}
+    const n=p.cables.filter(c=>c.from.item===it.id||c.to.item===it.id).length;
+    el.innerHTML=`<input id="iLbl" value="${esc(it.label)}" aria-label="Bezeichnung" style="max-width:220px"><span class="muted">${esc(it.gear.name)} · ${n} Kabel</span><span class="spacer"></span><button class="btn sm" id="iCab">Kabel lösen</button><button class="btn sm" id="iDup">Duplizieren</button><button class="btn sm danger" id="iDel">Entfernen</button>`;
+    $('#iLbl').oninput=e=>{it.label=e.target.value;save();clearTimeout(drawInsp.t);drawInsp.t=setTimeout(()=>{const f=document.activeElement&&document.activeElement.id;drawCanvas();if(f==='iLbl'){const i=$('#iLbl');i.focus();i.setSelectionRange(i.value.length,i.value.length);}},500);};
+    $('#iCab').onclick=()=>{p.cables=p.cables.filter(c=>c.from.item!==it.id&&c.to.item!==it.id);save();drawCanvas();};
+    $('#iDup').onclick=()=>{const g=S.lib.find(g=>g.id===it.gearId)||it.gear;const ni=addItem(p,g,it.x+40,it.y+40);ni.gear=clone(it.gear);sel={kind:'item',id:ni.id};save();drawCanvas();};
+    $('#iDel').onclick=()=>{p.items=p.items.filter(x=>x.id!==it.id);p.cables=p.cables.filter(c=>c.from.item!==it.id&&c.to.item!==it.id);sel=null;save();drawCanvas();};return;}
+  const nw=p.cables.filter(c=>c.warn).length;
+  el.innerHTML=`<span class="hint">${p.items.length} Geräte · ${p.cables.length} Kabel${nw?` · <span style="color:var(--accent)">${nw} Hinweise</span>`:''}</span><span class="spacer"></span><span class="hint">Anschluss tippen und dann den Gegenanschluss tippen, um ein Kabel zu ziehen.</span>`;
+}
+
+/* ---------- Dialoge ---------- */
+function modal(html,onMount){const m=$('#modal');m.innerHTML=`<div class="dlg" role="dialog" aria-modal="true">${html}</div>`;m.hidden=false;m.onclick=e=>{if(e.target===m)closeModal();};const x=m.querySelector('[data-close]');m.querySelectorAll('[data-close]').forEach(b=>b.onclick=closeModal);onMount&&onMount(m);}
+function closeModal(){const m=$('#modal');m.hidden=true;m.innerHTML='';}
+let toastT;function toast(t){const el=$('#toast');el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,2600);}
+
+function openAdd(){
+  const p=plan();
+  modal(`<header><h2>Geräte hinzufügen</h2><span class="spacer"></span><button class="btn sm" data-close>Fertig</button></header>
+   <div class="body">
+    <input id="aq" placeholder="Bibliothek durchsuchen …" aria-label="Suchen">
+    <div class="alist" id="al"></div>
+    <details><summary style="cursor:pointer;font-weight:600">Geräteliste einfügen</summary>
+      <p class="muted" style="margin:8px 0">Eine Zeile pro Gerät, z. B. <span class="mono">4x AW-UE160</span>. Namen werden mit der Bibliothek abgeglichen.</p>
+      <textarea id="at" placeholder="1x Kairos AT-KC200&#10;4x AW-UE160&#10;2x Lilliput BM280-4KS"></textarea>
+      <div class="row" style="margin-top:8px"><button class="btn pri" id="ago">Übernehmen</button><span id="ares" class="muted"></span></div>
+    </details>
+   </div>`,m=>{
+    const draw=()=>{const q=norm($('#aq').value);
+      $('#al').innerHTML=S.lib.filter(g=>!q||norm(g.name+g.mfr+g.cat).includes(q)).map(g=>{const n=p.items.filter(i=>i.gearId===g.id).length;
+        return`<div class="ai"><span class="sw" style="background:${g.color};width:14px;height:14px;border-radius:3px"></span><div class="t"><div><b>${esc(g.name)}</b></div><div class="muted" style="font-size:12px">${esc([g.mfr,g.cat].filter(Boolean).join(' · '))} · ${g.ports.length} Anschlüsse</div></div>
+        <span class="mono muted">${n?n+'×':''}</span><button class="btn sm" data-rm="${g.id}" ${n?'':'disabled'} aria-label="Eins entfernen">−</button><button class="btn sm pri" data-add="${g.id}" aria-label="Eins hinzufügen">+</button></div>`;}).join('')||'<p class="muted">Kein Gerät gefunden. Im Tab Geräte kannst du es anlegen.</p>';
+      m.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{place(p,[addItem(p,S.lib.find(g=>g.id===b.dataset.add))]);save();draw();drawCanvas();});
+      m.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{const l=p.items.filter(i=>i.gearId===b.dataset.rm);const it=l[l.length-1];if(!it)return;p.items=p.items.filter(x=>x!==it);p.cables=p.cables.filter(c=>c.from.item!==it.id&&c.to.item!==it.id);save();draw();drawCanvas();});
+    };
+    $('#aq').oninput=draw; draw();
+    $('#ago').onclick=()=>{
+      const miss=[],added=[];
+      $('#at').value.split('\n').map(s=>s.trim()).filter(Boolean).forEach(line=>{
+        const mm=line.match(/^(\d+)\s*[x×*]?\s+(.+)$/i)||line.match(/^(\d+)\s*[x×*]\s*(.+)$/i);
+        const n=mm?+mm[1]:1, name=mm?mm[2]:line, q=norm(name);
+        let g=S.lib.find(g=>norm(g.name)===q)||S.lib.find(g=>norm(g.name).includes(q)||q.includes(norm(g.name)));
+        if(!g||q.length<2){miss.push(line);return;}
+        for(let i=0;i<n;i++)added.push(addItem(p,g));
+      });
+      place(p,added);save();draw();drawCanvas();
+      $('#ares').innerHTML=`${added.length} Geräte hinzugefügt.`+(miss.length?` <span style="color:var(--accent)">Nicht gefunden: ${esc(miss.join(', '))}</span>`:'');
+      if(!miss.length)$('#at').value='';
+    };
+  });
+}
+function place(p,list){
+  if(!list.length)return; const others=p.items.filter(i=>!list.includes(i));
+  let x0=0,y0=0; if(others.length){const b=bbox({items:others});x0=b.x+b.w+40;y0=b.y+80;}
+  let x=x0,y=y0; list.forEach((it,i)=>{it.x=Math.round(x/10)*10;it.y=y;x+=geom(it.gear).w+40;if((i+1)%4===0){x=x0;y+=150;}});
+}
+
+function openAuto(){
+  const p=plan();
+  modal(`<header><h2>Auto-Verkabelung</h2><span class="spacer"></span><button class="btn sm" data-close>Schließen</button></header>
+   <div class="body">
+    <p class="muted" style="margin:0">Quellen auf die Kreuzschiene, Kreuzschiene auf den Bildmischer, Rückführung, Monitore, Referenz, Netzwerk, USB und Audio. Von Hand gezogene Kabel bleiben erhalten.</p>
+    <div class="fgrid">
+      <label class="chk"><input type="checkbox" id="oR" checked>Bisherige Auto-Kabel ersetzen</label>
+      <label class="chk"><input type="checkbox" id="oV" checked>Video, Referenz, Multiviewer</label>
+      <label class="chk"><input type="checkbox" id="oN" checked>Netzwerk und Glasfaser</label>
+      <label class="chk"><input type="checkbox" id="oU" checked>USB</label>
+      <label class="chk"><input type="checkbox" id="oA" checked>Audio (XLR)</label>
+      <label class="chk"><input type="checkbox" id="oL" checked>Danach anordnen</label>
+    </div>
+    <div id="ores" class="res"></div>
+   </div>
+   <footer><button class="btn pri" id="ogo">Verkabeln</button></footer>`,()=>{
+    $('#ogo').onclick=()=>{
+      const r=autowire(p,{replace:$('#oR').checked,video:$('#oV').checked,net:$('#oN').checked,usb:$('#oU').checked,audio:$('#oA').checked});
+      if($('#oL').checked){layout(p);fitPending=true;}
+      p.example=false; save(); sel=null;pend=null; renderPlan();
+      $('#ores').innerHTML=`<b>${r.made} Kabel gezogen${r.removed?`, ${r.removed} alte Auto-Kabel entfernt`:''}.</b>`+r.log.map(l=>`<div>${esc(l)}</div>`).join('')+r.warn.map(w=>`<div class="w">${esc(w)}</div>`).join('');
+    };
+  });
+}
+
+/* ---------- Export ---------- */
+function csv(rows){return'﻿'+rows.map(r=>r.map(v=>{v=String(v??'');return/[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}).join(';')).join('\r\n');}
+function saveFile(name,text,mime){try{const b=new Blob([text],{type:mime});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5000);}catch(e){toast('Speichern nicht möglich – bitte Kopieren nutzen');}}
+function showExport(title,file,text,mime){
+  modal(`<header><h2>${esc(title)}</h2><span class="spacer"></span><button class="btn sm" data-close>Schließen</button></header>
+   <div class="body"><p class="muted" style="margin:0">Datei <span class="mono">${esc(file)}</span>. Falls das Speichern hier nicht geht, kopieren und in eine Datei einfügen.</p><textarea id="ex" readonly style="min-height:220px"></textarea></div>
+   <footer><button class="btn" id="exC">Kopieren</button><button class="btn pri" id="exS">Datei speichern</button></footer>`,()=>{
+    $('#ex').value=text;
+    $('#exC').onclick=()=>{const t=$('#ex');navigator.clipboard?.writeText(text).then(()=>toast('Kopiert'),()=>{t.select();toast('Text markiert – jetzt kopieren');})??(t.select(),toast('Text markiert – jetzt kopieren'));};
+    $('#exS').onclick=()=>saveFile(file,text,mime);
+  });
+}
+const fname=s=>s.replace(/[^\wäöüÄÖÜß.-]+/g,'_').replace(/_+/g,'_');
+function exportSvg(){
+  const p=plan(),b=bbox(p),w=$('#world');
+  const s=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${b.x} ${b.y} ${b.w} ${b.h}" width="${Math.round(b.w)}" height="${Math.round(b.h)}"><rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="#15181d"/>${w.innerHTML.replace(/ data-(item|port|cable)="[^"]*"/g,'').replace(/var\(--accent\)/g,'#f0a43a')}</svg>`;
+  showExport('Plan als Bild (SVG)',fname(p.name)+'.svg',s,'image/svg+xml');
+}
+
+/* ---------- Patches ---------- */
+function patchRows(p){
+  const cnt={};
+  return p.cables.map(c=>{const t=cableText(p,c);return{c,...t};}).filter(r=>r.a&&r.b)
+   .sort((x,y)=>Object.keys(TYPES).indexOf(x.c.type)-Object.keys(TYPES).indexOf(y.c.type)||x.a.label.localeCompare(y.a.label,'de',{numeric:true})||x.a.gear.ports.indexOf(x.pa)-y.a.gear.ports.indexOf(y.pa))
+   .map(r=>{cnt[r.c.type]=(cnt[r.c.type]||0)+1;r.no=r.c.type+'-'+String(cnt[r.c.type]).padStart(3,'0');return r;});
+}
+function renderPatches(){
+  const p=plan(),m=$('#main');m.className='';
+  m.innerHTML=`<div class="wrap"><div class="row" style="margin-bottom:12px"><div><h1>Patches</h1><p class="sub" style="margin:0">${esc(p.name)} · ${p.cables.length} Kabel. Die Nummern eignen sich für Kabelbeschriftungen.</p></div><span class="spacer"></span>
+   <input id="pf" placeholder="Filtern …" aria-label="Patches filtern"><button class="btn" id="pcsv">Als Excel-Tabelle (CSV)</button></div>
+   <div class="tbl"><table><thead><tr><th>Nr.</th><th>Typ</th><th>Von</th><th>Ausgang</th><th></th><th>Nach</th><th>Eingang</th><th>Hinweis</th><th></th></tr></thead><tbody id="pt"></tbody></table></div></div>`;
+  const rows=patchRows(p);
+  const draw=()=>{const q=norm($('#pf').value);
+    $('#pt').innerHTML=rows.filter(r=>!q||norm([r.no,TYPES[r.c.type].n,r.a.label,r.pa.name,r.b.label,r.pb.name,r.c.note].join(' ')).includes(q)).map(r=>`<tr>
+     <td class="mono">${r.no}</td><td><span class="sw" style="background:${TYPES[r.c.type].c}"></span> ${TYPES[r.c.type].n}</td><td>${esc(r.a.label)}</td><td><b>${esc(r.pa.name)}</b></td><td class="muted">→</td><td>${esc(r.b.label)}</td><td><b>${esc(r.pb.name)}</b></td>
+     <td class="${r.c.warn?'warn':'muted'}">${esc(r.c.warn||r.c.note||'')}</td><td><button class="btn sm danger" data-del="${r.c.id}" aria-label="Kabel entfernen">✕</button></td></tr>`).join('')||`<tr><td colspan="9" class="muted">Noch keine Kabel. Im Plan „Auto-Verkabelung“ starten oder Anschlüsse antippen.</td></tr>`;
+    m.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{p.cables=p.cables.filter(c=>c.id!==b.dataset.del);save();renderPatches();});
+  };
+  $('#pf').oninput=draw;draw();
+  $('#pcsv').onclick=()=>showExport('Patchliste',fname(p.name)+'_Patches.csv',csv([['Nr.','Typ','Format','Von','Ausgang','Nach','Eingang','Hinweis'],...rows.map(r=>[r.no,TYPES[r.c.type].n,r.pa.level||'',r.a.label,r.pa.name,r.b.label,r.pb.name,r.c.warn||r.c.note||''])]),'text/csv');
+}
+
+/* ---------- Packliste ---------- */
+function packData(p){
+  const gear={};p.items.forEach(i=>{const k='g:'+i.gear.name;(gear[k]??={k,name:i.gear.name,mfr:i.gear.mfr,n:0}).n++;});
+  const cab={};p.cables.forEach(c=>{const k='c:'+c.type;(cab[k]??={k,name:TYPES[c.type].n,type:c.type,n:0}).n++;});
+  return{gear:Object.values(gear).sort((a,b)=>a.name.localeCompare(b.name,'de')),cab:Object.values(cab).sort((a,b)=>b.n-a.n)};
+}
+function renderPack(){
+  const p=plan(),m=$('#main');m.className='';p.packed??={};
+  const d=packData(p),all=[...d.gear,...d.cab],done=all.filter(x=>p.packed[x.k]).length,pc=all.length?Math.round(done/all.length*100):0;
+  const li=x=>`<label class="pk ${p.packed[x.k]?'done':''}"><input type="checkbox" data-k="${esc(x.k)}" ${p.packed[x.k]?'checked':''}><span class="n mono">${x.n}×</span>${x.type?`<span class="sw" style="background:${TYPES[x.type].c}"></span>`:''}<span>${esc(x.name)}</span>${x.mfr?`<span class="muted" style="font-size:12px">${esc(x.mfr)}</span>`:''}</label>`;
+  m.innerHTML=`<div class="wrap"><div class="row"><div><h1>Packliste</h1><p class="sub" style="margin:0">${esc(p.name)}</p></div><span class="spacer"></span>
+   <button class="btn" id="kr">Häkchen zurücksetzen</button><button class="btn" id="kcsv">Als Excel-Tabelle (CSV)</button></div>
+   <div class="row" style="margin-top:12px"><b class="mono">${pc} % gepackt</b><span class="muted">${done} von ${all.length} Positionen</span></div>
+   <div class="prog"><i style="width:${pc}%"></i></div>
+   <div class="pack"><div class="card"><h2>Geräte</h2>${d.gear.map(li).join('')||'<p class="muted">Keine Geräte im Plan.</p>'}</div>
+   <div class="card"><h2>Kabel</h2>${d.cab.map(li).join('')||'<p class="muted">Keine Kabel im Plan.</p>'}<p class="muted" style="font-size:12px;margin:10px 0 0">Ohne Reserve und ohne Längen. Strom ist nicht enthalten.</p></div></div></div>`;
+  m.querySelectorAll('[data-k]').forEach(c=>c.onchange=()=>{p.packed[c.dataset.k]=c.checked;save();renderPack();});
+  $('#kr').onclick=()=>{p.packed={};save();renderPack();};
+  $('#kcsv').onclick=()=>showExport('Packliste',fname(p.name)+'_Packliste.csv',csv([['Bereich','Anzahl','Bezeichnung','Hersteller','Gepackt'],...d.gear.map(x=>['Gerät',x.n,x.name,x.mfr||'',p.packed[x.k]?'ja':'']),...d.cab.map(x=>['Kabel',x.n,x.name,'',p.packed[x.k]?'ja':''])]),'text/csv');
+}
+
+/* ---------- Geräte ---------- */
+let editId=null;
+function renderGear(){
+  const m=$('#main');m.className='';
+  if(!S.lib.find(g=>g.id===editId))editId=S.lib[0]?.id||null;
+  m.innerHTML=`<div class="wrap"><div class="row" style="margin-bottom:12px"><div><h1>Geräte</h1><p class="sub" style="margin:0">Bibliothek mit Anschlüssen. Pläne behalten ihre eigene Kopie eines Geräts.</p></div><span class="spacer"></span>
+   <button class="btn pri" id="gNew">Neues Gerät</button><button class="btn" id="gExp">Bibliothek exportieren</button><label class="btn" for="gImp">Importieren</label><input type="file" id="gImp" accept=".json,application/json" hidden></div>
+   <div class="gear"><div class="card"><div style="padding:8px"><input id="gq" placeholder="Suchen …" style="width:100%" aria-label="Geräte suchen"></div><div class="glist" id="gl"></div></div>
+   <div class="card ged" id="ge"></div></div></div>`;
+  const drawList=()=>{const q=norm($('#gq').value);
+    $('#gl').innerHTML=S.lib.filter(g=>!q||norm(g.name+g.mfr+g.cat).includes(q)).map(g=>`<div class="gi" data-g="${g.id}" aria-current="${g.id===editId}" tabindex="0"><span class="chip" style="background:${g.color}"></span><div class="t"><div><b>${esc(g.name)}</b></div><div class="muted" style="font-size:12px">${esc([g.mfr,g.cat].filter(Boolean).join(' · '))}</div></div>${g.verify?'<span class="pill warn" title="Anschlüsse bitte mit Datenblatt prüfen">prüfen</span>':''}</div>`).join('');
+    m.querySelectorAll('[data-g]').forEach(e=>{e.onclick=()=>{editId=e.dataset.g;drawList();drawEd();};e.onkeydown=ev=>{if(ev.key==='Enter')e.click();};});
+  };
+  const drawEd=()=>{
+    const g=S.lib.find(x=>x.id===editId), el=$('#ge');
+    if(!g){el.innerHTML='<p class="muted">Kein Gerät gewählt.</p>';return;}
+    const inPlan=plan().items.filter(i=>i.gearId===g.id).length;
+    el.innerHTML=`<div class="prev" id="gp"></div>
+     ${g.verify?`<div class="row"><span class="pill warn">Anschlüsse prüfen</span><span class="muted" style="font-size:13px">Vorlage nach deinem H2R-Plan. Bitte mit dem Datenblatt abgleichen.</span><button class="btn sm" id="gOk">Geprüft</button></div>`:''}
+     <div class="fgrid">
+      <label class="f">Name<input id="gN" value="${esc(g.name)}"></label>
+      <label class="f">Hersteller<input id="gM" value="${esc(g.mfr)}"></label>
+      <label class="f">Kategorie<select id="gC">${CATS.map(c=>`<option ${c===g.cat?'selected':''}>${c}</option>`).join('')}</select></label>
+      <label class="f">Farbe<input id="gF" type="color" value="${esc(g.color)}" style="padding:2px;height:36px"></label>
+     </div>
+     <p class="muted" style="font-size:12px;margin:0">Die Kategorie steuert die Auto-Verkabelung: Kameras und Zuspieler sind Quellen, die Kreuzschiene mit den meisten SDI-Eingängen sammelt sie, der Bildmischer bekommt ihre Ausgänge.</p>
+     <div class="row"><h2>Anschlüsse</h2><span class="muted">${g.ports.length}</span></div>
+     <div class="ports" id="gPorts"></div>
+     <div class="card" style="padding:12px;display:grid;gap:8px;background:var(--panel2)">
+      <b style="font-size:13px">Mehrere Anschlüsse hinzufügen</b>
+      <div class="row">
+       <select id="nD" aria-label="Richtung">${Object.entries(DIRS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select>
+       <select id="nT" aria-label="Typ">${Object.entries(TYPES).map(([k,v])=>`<option value="${k}">${v.n}</option>`).join('')}</select>
+       <select id="nL" aria-label="Format">${LEVELS.map(l=>`<option value="${l}">${l||'–'}</option>`).join('')}</select>
+       <input id="nP" placeholder="Name, z. B. SDI In" style="flex:1;min-width:140px" aria-label="Namensanfang">
+       <input id="nC" type="number" min="1" max="128" value="1" style="width:80px" aria-label="Anzahl">
+       <button class="btn" id="nGo">Hinzufügen</button>
+      </div></div>
+     <div class="row"><button class="btn" id="gDup">Duplizieren</button><button class="btn" id="gSync" ${inPlan?'':'disabled'}>In aktuellen Plan übernehmen${inPlan?` (${inPlan})`:''}</button><span class="spacer"></span><button class="btn danger" id="gDel">Löschen</button></div>`;
+    const prev=()=>{const G_=geom(g);$('#gp').innerHTML=`<svg width="${G_.w+20}" height="${BH+20}" viewBox="-10 -10 ${G_.w+20} ${BH+20}">${blockSVG(g,0,0)}</svg>`;};
+    const ports=()=>{$('#gPorts').innerHTML=g.ports.map((pt,i)=>`<div class="prow">
+      <select data-f="dir" data-i="${i}" aria-label="Richtung">${Object.entries(DIRS).map(([k,v])=>`<option value="${k}" ${k===pt.dir?'selected':''}>${v}</option>`).join('')}</select>
+      <select data-f="type" data-i="${i}" aria-label="Typ">${Object.entries(TYPES).map(([k,v])=>`<option value="${k}" ${k===pt.type?'selected':''}>${v.n}</option>`).join('')}</select>
+      <select data-f="level" data-i="${i}" aria-label="Format" ${pt.type==='SDI'?'':'disabled'}>${LEVELS.map(l=>`<option value="${l}" ${l===pt.level?'selected':''}>${l||'–'}</option>`).join('')}</select>
+      <input data-f="name" data-i="${i}" value="${esc(pt.name)}" aria-label="Name">
+      <button class="btn sm danger" data-pd="${i}" aria-label="Anschluss löschen">✕</button></div>`).join('')||'<p class="muted">Noch keine Anschlüsse.</p>';
+      el.querySelectorAll('[data-f]').forEach(f=>{const ev=f.tagName==='INPUT'?'input':'change';f.addEventListener(ev,()=>{const pt=g.ports[+f.dataset.i];pt[f.dataset.f]=f.value;if(f.dataset.f==='type'&&f.value!=='SDI')pt.level='';save();prev();if(ev==='change')ports();});});
+      el.querySelectorAll('[data-pd]').forEach(b=>b.onclick=()=>{g.ports.splice(+b.dataset.pd,1);save();prev();ports();});
+    };
+    prev();ports();
+    const bindF=(id,key,ev='input')=>$(id).addEventListener(ev,e=>{g[key]=e.target.value;save();prev();drawList();});
+    bindF('#gN','name');bindF('#gM','mfr');bindF('#gC','cat','change');bindF('#gF','color');
+    if($('#gOk'))$('#gOk').onclick=()=>{g.verify=false;save();drawList();drawEd();};
+    $('#nGo').onclick=()=>{const n=Math.max(1,Math.min(128,+$('#nC').value||1)),pre=$('#nP').value.trim()||($('#nD').value==='out'?'Out':'In'),type=$('#nT').value;
+      for(let i=1;i<=n;i++)g.ports.push({id:uid(),name:n>1?`${pre} ${i}`:pre,dir:$('#nD').value,type,level:type==='SDI'?$('#nL').value:''});save();prev();ports();drawEd();};
+    $('#gDup').onclick=()=>{const c=clone(g);c.id=uid();c.name+=' (Kopie)';c.ports.forEach(pt=>pt.id=uid());S.lib.push(c);editId=c.id;save();drawList();drawEd();};
+    $('#gSync').onclick=()=>{const p=plan();let rm=0;p.items.filter(i=>i.gearId===g.id).forEach(i=>{i.gear=clone(g);const ok=new Set(g.ports.map(x=>x.id));const b=p.cables.length;p.cables=p.cables.filter(c=>!((c.from.item===i.id&&!ok.has(c.from.port))||(c.to.item===i.id&&!ok.has(c.to.port))));rm+=b-p.cables.length;});save();toast(`Übernommen${rm?`, ${rm} Kabel zu gelöschten Anschlüssen entfernt`:''}`);};
+    $('#gDel').onclick=()=>{const b=$('#gDel');if(b.dataset.c!=='1'){b.dataset.c='1';b.textContent='Wirklich löschen?';setTimeout(()=>{if(b.isConnected){b.dataset.c='';b.textContent='Löschen';}},3000);return;}S.lib=S.lib.filter(x=>x.id!==g.id);editId=null;save();renderGear();};
+  };
+  $('#gq').oninput=drawList;drawList();drawEd();
+  $('#gNew').onclick=()=>{const g={id:uid(),name:'Neues Gerät',mfr:'',cat:'Sonstiges',color:'#9aa1ab',ports:[{id:uid(),name:'In 1',dir:'in',type:'SDI',level:'3G'},{id:uid(),name:'Out 1',dir:'out',type:'SDI',level:'3G'}]};S.lib.unshift(g);editId=g.id;save();renderGear();setTimeout(()=>{const n=$('#gN');n&&n.select();},0);};
+  $('#gExp').onclick=()=>showExport('Gerätebibliothek','Kabelplan_Geraete.json',JSON.stringify({kind:'kabelplan-lib',v:1,lib:S.lib},null,1),'application/json');
+  $('#gImp').onchange=e=>readJson(e.target.files[0],d=>{const l=d.lib||(Array.isArray(d)?d:null);if(!l)return toast('Keine Gerätebibliothek in der Datei');let n=0;l.forEach(g=>{if(!g||!g.name||!Array.isArray(g.ports))return;const ex=S.lib.find(x=>x.id===g.id);if(ex)Object.assign(ex,g);else S.lib.push(g);n++;});save();renderGear();toast(`${n} Geräte importiert`);});
+}
+function readJson(f,cb){if(!f)return;const r=new FileReader();r.onload=()=>{try{cb(JSON.parse(r.result));}catch(e){toast('Datei ist kein gültiges JSON');}};r.readAsText(f);}
+
+/* ---------- Pläne ---------- */
+function renderPlans(){
+  const m=$('#main');m.className='';
+  m.innerHTML=`<div class="wrap"><div class="row" style="margin-bottom:12px"><div><h1>Pläne</h1><p class="sub" style="margin:0">Alles liegt nur auf diesem Gerät. Sichere regelmäßig ein Backup.</p></div><span class="spacer"></span>
+   <button class="btn pri" id="lNew">Neuer Plan</button></div>
+   <div class="plist">${S.plans.map(p=>`<div class="card pl"><div class="t"><b>${esc(p.name)}</b> ${p.id===S.cur?'<span class="pill">offen</span>':''}${p.example?' <span class="pill warn">Beispiel</span>':''}<div class="muted mono" style="font-size:12px;margin-top:4px">${p.items.length} Geräte · ${p.cables.length} Kabel · angelegt ${esc(p.created||'')}</div></div>
+     <button class="btn pri" data-o="${p.id}">Öffnen</button><button class="btn" data-d="${p.id}">Duplizieren</button><button class="btn" data-x="${p.id}">Exportieren</button><button class="btn danger" data-r="${p.id}">Löschen</button></div>`).join('')}</div>
+   <div class="card" style="padding:16px;margin-top:24px;display:grid;gap:10px"><h2>Backup</h2>
+     <p class="muted" style="margin:0">Sichert alle Pläne und die Gerätebibliothek in eine Datei. Beim Wiederherstellen werden Pläne ergänzt, gleiche werden überschrieben.</p>
+     <div class="row"><button class="btn" id="bk">Backup erstellen</button><label class="btn" for="rs">Backup oder Plan laden</label><input type="file" id="rs" accept=".json,application/json" hidden></div></div></div>`;
+  m.querySelectorAll('[data-o]').forEach(b=>b.onclick=()=>{S.cur=b.dataset.o;fitPending=true;sel=pend=null;go('plan');});
+  m.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{const p=clone(S.plans.find(x=>x.id===b.dataset.d));p.id=uid();p.name+=' (Kopie)';p.example=false;p.packed={};p.created=new Date().toISOString().slice(0,10);S.plans.unshift(p);save();renderPlans();});
+  m.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{const p=S.plans.find(x=>x.id===b.dataset.x);showExport('Plan exportieren',fname(p.name)+'.kabelplan.json',JSON.stringify({kind:'kabelplan-plan',v:1,plan:p},null,1),'application/json');});
+  m.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{if(b.dataset.c!=='1'){b.dataset.c='1';b.textContent='Wirklich löschen?';setTimeout(()=>{if(b.isConnected){b.dataset.c='';b.textContent='Löschen';}},3000);return;}
+    S.plans=S.plans.filter(x=>x.id!==b.dataset.r);if(!S.plans.length){const p=newPlan('Neuer Plan');S.plans.push(p);}if(!S.plans.find(x=>x.id===S.cur))S.cur=S.plans[0].id;save();renderPlans();});
+  $('#lNew').onclick=()=>{const p=newPlan('Neuer Plan '+new Date().toLocaleDateString('de-AT'));S.plans.unshift(p);S.cur=p.id;save();fitPending=true;go('plan');setTimeout(openAdd,50);};
+  $('#bk').onclick=()=>showExport('Backup','Kabelplan_Backup_'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify({kind:'kabelplan-backup',v:1,lib:S.lib,plans:S.plans},null,1),'application/json');
+  $('#rs').onchange=e=>readJson(e.target.files[0],d=>{
+    let np=0,ng=0;
+    const plans=d.plans||(d.plan?[d.plan]:[]);
+    plans.forEach(p=>{if(!p||!Array.isArray(p.items)||!Array.isArray(p.cables))return;const i=S.plans.findIndex(x=>x.id===p.id);if(i>=0)S.plans[i]=p;else S.plans.push(p);np++;});
+    (d.lib||[]).forEach(g=>{if(!g||!Array.isArray(g.ports))return;const i=S.lib.findIndex(x=>x.id===g.id);if(i>=0)S.lib[i]=g;else S.lib.push(g);ng++;});
+    if(!np&&!ng)return toast('In der Datei wurde nichts Passendes gefunden');
+    save();renderPlans();toast(`${np} Pläne und ${ng} Geräte geladen`);
+  });
+}
+
+/* ---------- Navigation ---------- */
+function go(v){S.view=v;save();sel=sel&&v==='plan'?sel:null;
+  document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-current',String(b.dataset.v===v)));
+  ({plan:renderPlan,patches:renderPatches,pack:renderPack,gear:renderGear,plans:renderPlans}[v]||renderPlan)();
+}
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>go(b.dataset.v));
+window.addEventListener('resize',()=>{if(S.view==='plan')applyView();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(!$('#modal').hidden)closeModal();else if(S.view==='plan'){sel=pend=null;drawCanvas();}}
+  if((e.key==='Delete'||e.key==='Backspace')&&S.view==='plan'&&sel&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){const b=$('#iDel');b&&b.click();}});
+load();go(S.view);
+try{if('serviceWorker' in navigator&&location.protocol==='https:'&&document.querySelector('link[rel="manifest"]'))navigator.serviceWorker.register('sw.js').catch(()=>{});}catch(e){}
+</script>
+
+</body></html>
