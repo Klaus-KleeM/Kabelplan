@@ -1,11 +1,27 @@
-KLEEM Kabelplan – Offline-App für iPad
+KLEEM Kabelplan – Update auf Version 2
 
-1. Den Ordnerinhalt (index.html, sw.js, manifest.webmanifest, icon-*.png) auf einen HTTPS-Webspace laden,
-   z. B. in einen Unterordner von kleem.tv (https://kleem.tv/kabelplan/) oder auf GitHub Pages.
-   Wichtig: HTTPS, sonst funktioniert der Offline-Speicher nicht.
-2. Am iPad die Adresse in Safari öffnen, Teilen-Symbol > "Zum Home-Bildschirm".
-3. Ab jetzt die App über das Home-Symbol starten. Sie läuft danach ohne Internet.
+VOR DEM UPDATE
+1. Kabelplan am iPad öffnen > Pläne > Backup erstellen > Datei speichern.
 
-Daten: Pläne und Geräte liegen nur am iPad (in der Home-Bildschirm-App).
-Regelmäßig unter "Pläne > Backup erstellen" sichern, z. B. in iCloud Drive.
-Update: neue Dateien hochladen und in sw.js die Versionsnummer (kabelplan-v1 -> v2) erhöhen.
+DATEIEN AUF GITHUB ERSETZEN
+2. Diese ZIP in der Dateien-App entpacken.
+3. github.com/Klaus-KleeM/Kabelplan öffnen > Add file > Upload files.
+4. Alle Dateien aus dem Ordner auswählen (index.html, sw.js, manifest.webmanifest, icon-*.png, ANLEITUNG.txt).
+   Gleichnamige Dateien werden automatisch ersetzt.
+5. Ganz unten "Commit changes" tippen.
+6. Unter "Actions" auf den grünen Haken warten (1–3 Minuten).
+
+AM IPAD AKTUALISIEREN
+7. Kabelplan über das Home-Symbol öffnen, ca. 10 Sekunden warten.
+8. App ganz schließen (von unten wischen, Karte wegschieben).
+9. Wieder öffnen. Jetzt läuft Version 2 und zeigt "Auf Version 2 aktualisiert".
+   Falls noch Version 1 erscheint: Schritt 7–9 wiederholen.
+
+WAS DABEI PASSIERT
+- Deine Pläne bleiben erhalten. Das Beispiel wird neu erzeugt.
+- Die Bibliothek wird durch die neue (74 Geräte) ersetzt; deine bisherigen Geräte werden über den Namen zugeordnet.
+- Bestehende Pläne behalten ihre alten Geräte-Kopien. Neue Anschlüsse holst du pro Gerät in der Bibliothek mit
+  "In aktuellen Plan übernehmen" (dabei werden Kabel zu nicht mehr vorhandenen Anschlüssen entfernt).
+
+FALLS ETWAS SCHIEFGEHT
+- Pläne > Backup oder Plan laden > die gesicherte Datei wählen.
