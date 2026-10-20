@@ -1,0 +1,2644 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Companion Builder</title>
+<meta name="description" content="KLEEM – Stream-Deck-Grundbelegungen für Bitfocus Companion erzeugen, offline">
+<meta name="theme-color" content="#0e1116">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Companion">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+:root {
+  --bg: #0e1116;
+  --panel: #161b22;
+  --panel2: #1d232c;
+  --line: #2a313c;
+  --text: #e6e9ee;
+  --muted: #8b95a5;
+  --accent: #ff7a1a;
+  --accent2: #ffb366;
+  --ok: #2fbf71;
+  --warn: #f2c94c;
+  --err: #eb5757;
+  --radius: 10px;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+:root[data-theme='light'] {
+  --bg: #f3f4f6;
+  --panel: #ffffff;
+  --panel2: #f7f8fa;
+  --line: #d9dde3;
+  --text: #15191f;
+  --muted: #5f6977;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    --bg: #f3f4f6;
+    --panel: #ffffff;
+    --panel2: #f7f8fa;
+    --line: #d9dde3;
+    --text: #15191f;
+    --muted: #5f6977;
+    color-scheme: light;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 var(--font); -webkit-text-size-adjust: 100%; }
+body { padding-bottom: env(safe-area-inset-bottom); }
+button, input, select, textarea { font: inherit; color: inherit; }
+h2 { font-size: 1.15rem; margin: 0 0 .75rem; }
+h3 { font-size: 1rem; margin: 0; }
+small, .muted { color: var(--muted); }
+code { font-family: var(--mono); font-size: .85em; }
+
+/* Kopf */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: calc(10px + env(safe-area-inset-top)) 16px 10px; background: var(--panel); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand small { display: block; font-size: .75rem; }
+.logo { width: 34px; height: 34px; border-radius: 8px; background: var(--accent); color: #111; display: grid; place-items: center; font-weight: 800; flex: none; }
+.applinks { display: flex; gap: 6px; margin-left: auto; }
+.applinks a { color: var(--accent2); text-decoration: none; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: .9rem; white-space: nowrap; }
+.project { display: flex; gap: 6px; align-items: center; min-width: 0; }
+.project select { max-width: 220px; }
+
+.tabs { display: flex; gap: 4px; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line); overflow-x: auto; position: sticky; top: 57px; z-index: 4; }
+.tabs button { background: none; border: 0; padding: 8px 14px; border-radius: 8px; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.tabs button.active { background: var(--panel2); color: var(--text); box-shadow: inset 0 -2px 0 var(--accent); }
+.tabs .icon { margin-left: auto; }
+
+main { padding: 16px; max-width: 1400px; margin: 0 auto; }
+.tab { display: none; }
+.tab.active { display: block; }
+
+/* Bausteine */
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; margin-bottom: 12px; }
+.card-head { display: flex; align-items: center; gap: 10px; justify-content: space-between; flex-wrap: wrap; margin-bottom: 10px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.grid-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px 12px; }
+label.f { display: flex; flex-direction: column; gap: 4px; font-size: .8rem; color: var(--muted); }
+label.f.check { flex-direction: row; align-items: center; gap: 8px; color: var(--text); font-size: .9rem; }
+input, select, textarea { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-height: 38px; width: 100%; }
+input[type='checkbox'] { width: 20px; height: 20px; min-height: 0; accent-color: var(--accent); }
+input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+button.btn, .btn { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; min-height: 38px; cursor: pointer; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #111; font-weight: 600; }
+.btn.danger { color: var(--err); }
+.btn:disabled { opacity: .5; cursor: default; }
+button.ghost { background: none; border: 1px solid var(--line); border-radius: 8px; min-width: 38px; min-height: 38px; cursor: pointer; }
+.pill { display: inline-block; font-size: .72rem; padding: 2px 8px; border-radius: 99px; background: var(--panel2); border: 1px solid var(--line); color: var(--muted); }
+.pill.kp { border-color: var(--accent); color: var(--accent2); }
+.empty { text-align: center; padding: 30px 10px; color: var(--muted); }
+.hint { font-size: .85rem; color: var(--muted); margin: 6px 0 0; }
+.warn { color: var(--warn); }
+.list-actions { display: flex; gap: 6px; }
+
+.add-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+
+.page-row { display: grid; grid-template-columns: 28px minmax(140px, 1fr) minmax(140px, 1.2fr) minmax(180px, 2fr) auto; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+.page-row .num { color: var(--muted); font-variant-numeric: tabular-nums; }
+.cams { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.cams label { display: flex; gap: 6px; align-items: center; font-size: .85rem; }
+
+/* Vorschau */
+.preview-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+.deck { background: #050608; border-radius: 18px; padding: 16px; font-size: 11px; display: inline-grid; gap: 8px; border: 1px solid #222; max-width: 100%; overflow-x: auto; }
+.cell { width: var(--k, 72px); height: var(--k, 72px); border-radius: 9px; border: 1px solid #000; display: flex; align-items: center; justify-content: center; text-align: center; font-size: inherit; line-height: 1.15; color: #fff; padding: 4px; white-space: pre-line; overflow: hidden; cursor: pointer; position: relative; word-break: break-word; }
+.cell.empty { background: #15181d; border: 1px dashed #2b2f36; cursor: default; }
+.cell.sel { outline: 3px solid var(--accent); outline-offset: 1px; }
+.cell .fb { position: absolute; top: 3px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+.cell.lcd { width: auto; border-radius: 4px; height: calc(var(--k, 72px) * .8); background: #0b0f14; }
+.cell.enc { border-radius: 50%; background: radial-gradient(circle at 40% 35%, #555, #1a1a1a 70%); border: 2px solid #333; }
+.cell.enc span { font-size: 10px; }
+.cell.nav { background: #303030; }
+.cell.ring { box-shadow: 0 0 0 3px #2a6; }
+.deck-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.deck-tabs button { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+.deck-tabs button.active { border-color: var(--accent); color: var(--accent2); }
+.detail { position: sticky; top: 120px; }
+.detail pre { background: var(--panel2); border-radius: 8px; padding: 8px; font: 12px/1.4 var(--mono); white-space: pre-wrap; word-break: break-word; max-height: 50vh; overflow: auto; margin: 6px 0; }
+.detail h4 { margin: 12px 0 2px; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.report { font-size: .85rem; }
+.report li { margin: 2px 0; }
+
+dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 0; width: min(560px, calc(100vw - 32px)); }
+dialog::backdrop { background: rgba(0, 0, 0, .55); }
+dialog form { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.dlg-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.kp-list { max-height: 50vh; overflow: auto; display: flex; flex-direction: column; gap: 4px; }
+.kp-list label { display: flex; gap: 8px; align-items: center; padding: 6px; border-radius: 6px; background: var(--panel2); }
+
+#toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(20px); background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px; opacity: 0; transition: .25s; pointer-events: none; z-index: 20; max-width: calc(100vw - 32px); }
+#toast.show { opacity: 1; transform: translateX(-50%); }
+
+@media (max-width: 900px) {
+  .preview-wrap { grid-template-columns: 1fr; }
+  .detail { position: static; }
+  .page-row { grid-template-columns: 24px 1fr; }
+  .page-row > :nth-child(n + 3) { grid-column: 2; }
+}
+@media (max-width: 560px) {
+  .applinks a { padding: 6px 8px; font-size: .8rem; }
+  .brand small { display: none; }
+  .project select { max-width: 140px; }
+  main { padding: 12px 16px; }
+}
+
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="logo">K</span><div><strong>Companion Builder</strong><small>KLEEM · Stream Deck → Companion 4.3+</small></div></div>
+  <nav class="applinks"><a href="index.html">Kabelplan</a><a href="lager.html">Lager</a></nav>
+  <div class="project">
+    <select id="projectSelect" aria-label="Projekt"></select>
+    <button id="projectNew" class="ghost" title="Neues Projekt">＋</button>
+    <button id="projectMenu" class="ghost" title="Projekt-Aktionen">⋯</button>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button data-tab="devices" class="active">Geräte</button>
+  <button data-tab="decks">Stream Decks</button>
+  <button data-tab="preview">Vorschau</button>
+  <button data-tab="export">Export</button>
+  <button data-tab="settings" class="icon" title="Einstellungen">⚙</button>
+</nav>
+
+<main>
+  <section id="tab-devices" class="tab active"></section>
+  <section id="tab-decks" class="tab"></section>
+  <section id="tab-preview" class="tab"></section>
+  <section id="tab-export" class="tab"></section>
+  <section id="tab-settings" class="tab"></section>
+</main>
+
+<dialog id="dlg"><form method="dialog" id="dlgBody"></form></dialog>
+<div id="toast" role="status"></div>
+
+<script>
+(() => {
+  // js/decks.js
+  var DECKS = {
+    "mini": {
+      name: "Stream Deck Mini",
+      cols: 3,
+      rows: 2,
+      keys: [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2]],
+      noDisplay: false,
+      encoders: [],
+      lcd: [],
+      aliases: ["6-module"]
+    },
+    "original-mk2": {
+      name: "Stream Deck (15 Tasten: Original / MK.2 / Scissor)",
+      cols: 5,
+      rows: 3,
+      keys: [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [1, 0], [1, 1], [1, 2], [1, 3], [1, 4], [2, 0], [2, 1], [2, 2], [2, 3], [2, 4]],
+      noDisplay: false,
+      encoders: [],
+      lcd: [],
+      aliases: ["original", "originalv2", "original-mk2-scissor", "15-module", "15-module-scissor"]
+    },
+    "xl": {
+      name: "Stream Deck XL",
+      cols: 8,
+      rows: 4,
+      keys: [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [1, 0], [1, 1], [1, 2], [1, 3], [1, 4], [1, 5], [1, 6], [1, 7], [2, 0], [2, 1], [2, 2], [2, 3], [2, 4], [2, 5], [2, 6], [2, 7], [3, 0], [3, 1], [3, 2], [3, 3], [3, 4], [3, 5], [3, 6], [3, 7]],
+      noDisplay: false,
+      encoders: [],
+      lcd: [],
+      aliases: ["32-module"]
+    },
+    "plus": {
+      name: "Stream Deck +",
+      cols: 4,
+      rows: 4,
+      keys: [[0, 0], [0, 1], [0, 2], [0, 3], [1, 0], [1, 1], [1, 2], [1, 3]],
+      noDisplay: false,
+      encoders: [[3, 0, [2, 0], 0], [3, 1, [2, 1], 0], [3, 2, [2, 2], 0], [3, 3, [2, 3], 0]],
+      lcd: [[2, 0, 4]],
+      aliases: []
+    },
+    "plus-xl": {
+      name: "Stream Deck + XL",
+      cols: 9,
+      rows: 6,
+      keys: [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [0, 8], [1, 0], [1, 1], [1, 2], [1, 3], [1, 4], [1, 5], [1, 6], [1, 7], [1, 8], [2, 0], [2, 1], [2, 2], [2, 3], [2, 4], [2, 5], [2, 6], [2, 7], [2, 8], [3, 0], [3, 1], [3, 2], [3, 3], [3, 4], [3, 5], [3, 6], [3, 7], [3, 8]],
+      noDisplay: false,
+      encoders: [[5, 0, [4, 0], 0], [5, 2, [4, 2], 0], [5, 3, [4, 3], 0], [5, 5, [4, 5], 0], [5, 6, [4, 6], 0], [5, 8, [4, 8], 0]],
+      lcd: [[4, 0, 9]],
+      aliases: []
+    },
+    "neo": {
+      name: "Stream Deck Neo",
+      cols: 4,
+      rows: 3,
+      keys: [[0, 0], [0, 1], [0, 2], [0, 3], [1, 0], [1, 1], [1, 2], [1, 3], [2, 0], [2, 3]],
+      noDisplay: false,
+      encoders: [],
+      lcd: [[2, 1, 2]],
+      aliases: []
+    },
+    "studio": {
+      name: "Stream Deck Studio",
+      cols: 18,
+      rows: 2,
+      keys: [[0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [0, 8], [0, 9], [0, 10], [0, 11], [0, 12], [0, 13], [0, 14], [0, 15], [0, 16], [1, 1], [1, 2], [1, 3], [1, 4], [1, 5], [1, 6], [1, 7], [1, 8], [1, 9], [1, 10], [1, 11], [1, 12], [1, 13], [1, 14], [1, 15], [1, 16]],
+      noDisplay: false,
+      encoders: [[0, 0, null, 24], [0, 17, null, 24]],
+      lcd: [],
+      aliases: []
+    },
+    "pedal": {
+      name: "Stream Deck Pedal",
+      cols: 3,
+      rows: 1,
+      keys: [[0, 0], [0, 1], [0, 2]],
+      noDisplay: true,
+      encoders: [],
+      lcd: [],
+      aliases: []
+    },
+    "galleon-k100": {
+      name: "Corsair Galleon K100 SD",
+      cols: 3,
+      rows: 6,
+      keys: [[2, 0], [2, 1], [2, 2], [3, 0], [3, 1], [3, 2], [4, 0], [4, 1], [4, 2], [5, 0], [5, 1], [5, 2]],
+      noDisplay: false,
+      encoders: [[0, 0, [1, 0], 4], [0, 2, [1, 2], 4]],
+      lcd: [[1, 0, 3]],
+      aliases: []
+    }
+  };
+
+  // js/devices.js
+  var DEVICE_TYPES = {
+    vmix: {
+      short: "vMix",
+      name: "vMix",
+      vendor: "StudioCoast",
+      moduleId: "studiocoast-vmix",
+      moduleVersion: "5.0.6",
+      upgradeIndex: 17,
+      // 18 Upgrade-Skripte
+      role: "mixer",
+      defaultLabel: "vmix",
+      defaultHost: "127.0.0.1",
+      params: [
+        { id: "port", label: "TCP-Port", type: "number", default: 8099 },
+        { id: "inputs", label: "Inputs auf PGM/PVW-Reihen", type: "number", default: 8, min: 1, max: 32 },
+        { id: "inputNames", label: "Input-Namen (optional, mit Komma; leer = live aus vMix)", type: "list", default: "" },
+        { id: "overlays", label: "Overlay-Kanäle", type: "number", default: 2, min: 0, max: 4 },
+        { id: "buses", label: "Audio-Busse für Drehregler", type: "list", default: "Master,A,B" },
+        { id: "audioInputs", label: "Audio-Inputs (Drehregler-Seite)", type: "number", default: 4, min: 0, max: 16 },
+        { id: "volStep", label: "Lautstärke pro Rasterschritt (0–100 Skala)", type: "number", default: 2, min: 1, max: 10 }
+      ],
+      config: (d) => ({
+        host: d.host || "127.0.0.1",
+        tcpPort: Number(d.params.port) || 8099,
+        connectionErrorLog: true,
+        apiPollInterval: 250,
+        volumeLinear: false,
+        variablesShowInputs: true,
+        variablesShowInputsLowercase: true,
+        variablesShowInputNumbers: true,
+        variablesShowInputGUID: false,
+        variablesShowInputPosition: false,
+        variablesShowInputCC: false,
+        variablesShowInputLayers: false,
+        variablesShowInputLayerPosition: false,
+        variablesShowInputList: false,
+        variablesShowInputTitleIndex: false,
+        variablesShowInputTitleName: false,
+        variablesShowInputVolume: true,
+        // nötig für Lautstärke-Anzeige am LCD
+        variablesShowInputJSON: false,
+        variablesShowAudio: true,
+        // nötig für Bus-Lautstärke
+        variablesShowDynamicInputs: false,
+        variablesShowDynamicValues: false,
+        variablesShowMix: false,
+        variablesShowOutputs: false,
+        variablesShowOverlays: false,
+        variablesShowReplay: false,
+        variablesShowTransitions: false,
+        debugSettings: false,
+        debugVariableDefinitionDelay: 5e3,
+        debugVersionUpdateNotifications: true
+      })
+    },
+    atem: {
+      short: "ATEM",
+      name: "ATEM",
+      vendor: "Blackmagic Design",
+      moduleId: "bmd-atem",
+      moduleVersion: "4.4.0",
+      upgradeIndex: 10,
+      // 11 Upgrade-Skripte
+      role: "mixer",
+      defaultLabel: "atem",
+      defaultHost: "192.168.10.240",
+      params: [
+        { id: "inputs", label: "Inputs auf PGM/PVW-Reihen", type: "number", default: 8, min: 1, max: 40 },
+        { id: "me", label: "M/E für die Tasten", type: "number", default: 1, min: 1, max: 4 },
+        { id: "dsks", label: "Downstream-Keyer", type: "number", default: 2, min: 0, max: 4 },
+        { id: "macros", label: "Makro-Tasten (1…n)", type: "number", default: 0, min: 0, max: 20 },
+        { id: "recStream", label: "REC/STREAM-Tasten (ATEM Mini Pro/Extreme)", type: "bool", default: true },
+        { id: "fairlight", label: "Fairlight-Audio (Drehregler)", type: "bool", default: true },
+        { id: "audioInputs", label: "Audio-Inputs auf Drehreglern", type: "number", default: 4, min: 0, max: 16 },
+        { id: "gainStep", label: "dB pro Rasterschritt", type: "number", default: 1, min: 0.5, max: 6 }
+      ],
+      config: (d) => ({
+        host: d.host || "",
+        modelID: 0,
+        // 0 = automatisch erkennen
+        presets: 0,
+        fadeFps: 10,
+        enableCameraControl: false,
+        pollTimecode: false
+      })
+    },
+    kairos: {
+      short: "Kairos",
+      name: "Kairos",
+      vendor: "Panasonic",
+      moduleId: "panasonic-kairos",
+      moduleVersion: "4.2.2",
+      upgradeIndex: -1,
+      // keine Upgrade-Skripte
+      role: "mixer",
+      defaultLabel: "kairos",
+      hint: "Weicht der REST-Login vom Standard ab, Benutzer/Passwort nach dem Import in Companion eintragen (werden hier nicht gespeichert).",
+      defaultHost: "192.168.10.10",
+      params: [
+        { id: "tcpPort", label: "TCP-Port (Simple Protocol)", type: "number", default: 3005 },
+        { id: "restPort", label: "REST-Port", type: "number", default: 1234 },
+        { id: "scene", label: "Szene (Name)", type: "text", default: "Main" },
+        { id: "layer", label: "Layer (Name)", type: "text", default: "Background" },
+        { id: "sources", label: "Quellen (exakte Namen wie im Kairos, mit Komma)", type: "list", default: "IP1,IP2,IP3,IP4,IP5,IP6,IP7,IP8" }
+      ],
+      config: (d) => ({
+        host: d.host || "192.168.10.10",
+        tcpPort: Number(d.params.tcpPort) || 3005,
+        restPort: Number(d.params.restPort) || 1234,
+        username: "Kairos",
+        // Modul-Standard; abweichende Zugangsdaten in Companion eintragen
+        password: ""
+      })
+    },
+    ptz: {
+      short: "PTZ",
+      name: "PTZ-Kamera",
+      vendor: "Panasonic",
+      moduleId: "panasonic-ptz",
+      moduleVersion: "2.6.1",
+      upgradeIndex: 0,
+      // 1 Upgrade-Skript
+      role: "ptz",
+      defaultLabel: "cam1",
+      defaultHost: "192.168.0.10",
+      params: [
+        { id: "title", label: "Anzeigename", type: "text", default: "CAM 1" },
+        { id: "presets", label: "Preset-Tasten", type: "number", default: 8, min: 1, max: 100 },
+        { id: "tallyInput", label: "Tally: Mischer-Input (vMix/ATEM: Nummer, Kairos: Quellname; leer = aus)", type: "text", default: "" },
+        { id: "pulse", label: "Zoom/Fokus-Impuls pro Raster (ms)", type: "number", default: 120, min: 40, max: 500 },
+        { id: "rpCam", label: "Kameranummer am RP-Controller (leer = Reihenfolge)", type: "number", default: "", min: 1, max: 200 }
+      ],
+      config: (d) => ({
+        host: d.host || "",
+        httpPort: 80,
+        model: "Auto",
+        autoTCP: true,
+        tcpPort: 31004,
+        debug: false
+      })
+    },
+    videohub: {
+      short: "Router",
+      name: "Videohub",
+      vendor: "Blackmagic Design",
+      moduleId: "bmd-videohub",
+      moduleVersion: "3.2.1",
+      upgradeIndex: 3,
+      // 4 Upgrade-Skripte
+      role: "router",
+      defaultLabel: "videohub",
+      defaultHost: "192.168.10.150",
+      params: [
+        { id: "inputCount", label: "Inputs", type: "number", default: 12, min: 1, max: 288 },
+        { id: "outputCount", label: "Outputs", type: "number", default: 12, min: 1, max: 288 },
+        { id: "destinations", label: "Ziele auf Tasten (Output-Nummern, mit Komma)", type: "list", default: "1,2,3,4" },
+        { id: "sources", label: "Quellen auf Tasten (Input-Nummern, mit Komma)", type: "list", default: "1,2,3,4,5,6,7,8" },
+        { id: "take", label: "Take-Modus (erst wählen, dann TAKE)", type: "bool", default: false }
+      ],
+      config: (d) => ({
+        host: d.host || "192.168.10.150",
+        port: 9990,
+        take: !!d.params.take,
+        inputCount: Number(d.params.inputCount) || 12,
+        outputCount: Number(d.params.outputCount) || 12,
+        monitoringCount: 0,
+        serialCount: 0
+      })
+    },
+    ppt: {
+      short: "PPT",
+      name: "PowerPoint (OSC)",
+      vendor: "OSCPoint",
+      moduleId: "zinc-oscpoint",
+      moduleVersion: "2.0.0",
+      upgradeIndex: -1,
+      // keine Upgrade-Skripte
+      role: "presentation",
+      defaultLabel: "ppt",
+      defaultHost: "127.0.0.1",
+      hint: "PowerPoint-Steuerung über OSC mit dem Add-in „OSCPoint“ auf dem Präsentationsrechner.",
+      params: [
+        { id: "remotePort", label: "OSCPoint-Port (senden)", type: "number", default: 35551 },
+        { id: "localPort", label: "Feedback-Port (empfangen, je Rechner eindeutig)", type: "number", default: 35550 }
+      ],
+      config: (d) => ({
+        remotehost: d.host || "127.0.0.1",
+        remoteport: String(Number(d.params.remotePort) || 35551),
+        localport: String(Number(d.params.localPort) || 35550)
+      })
+    },
+    mitti: {
+      short: "Mitti",
+      name: "Mitti",
+      vendor: "imimot",
+      moduleId: "imimot-mitti",
+      moduleVersion: "3.10.2",
+      upgradeIndex: 3,
+      // 4 Upgrade-Skripte
+      role: "playback",
+      defaultLabel: "mitti",
+      defaultHost: "127.0.0.1",
+      params: [
+        { id: "feedbackPort", label: "Feedback-Port", type: "number", default: 51001 },
+        { id: "cues", label: "Cue-Tasten (Cue-IDs 1…n)", type: "number", default: 8, min: 0, max: 64 },
+        { id: "scrub", label: "Playhead pro Rasterschritt (Sekunden)", type: "number", default: 2, min: 1, max: 30 },
+        { id: "volStep", label: "Cue-Lautstärke pro Rasterschritt (dB)", type: "number", default: 1, min: 0.5, max: 6 }
+      ],
+      config: (d) => ({
+        host: d.host || "127.0.0.1",
+        feedbackPort: String(Number(d.params.feedbackPort) || 51001),
+        feedbackAlert: false
+      })
+    },
+    qlab: {
+      short: "QLab",
+      name: "QLab",
+      vendor: "Figure 53",
+      moduleId: "figure53-qlab-advance",
+      moduleVersion: "2.15.0",
+      upgradeIndex: 3,
+      // 4 Upgrade-Skripte
+      role: "playback",
+      defaultLabel: "qlab",
+      hint: "Ist im QLab-Workspace ein OSC-Passcode gesetzt, nach dem Import in Companion eintragen (wird hier nicht gespeichert).",
+      defaultHost: "127.0.0.1",
+      params: [
+        { id: "port", label: "Port", type: "number", default: 53e3 },
+        { id: "cues", label: "Cue-Tasten (Cue-Nummern 1…n)", type: "number", default: 8, min: 0, max: 64 }
+      ],
+      config: (d) => ({
+        host: d.host || "127.0.0.1",
+        port: String(Number(d.params.port) || 53e3),
+        useTCP: true,
+        passcode: "",
+        // Zugangsdaten werden nicht gespeichert – ggf. in Companion eintragen
+        useTenths: false,
+        cuelist: "default",
+        workspace: "default"
+      })
+    },
+    timer: {
+      short: "Timer",
+      name: "Countdown Timer",
+      vendor: "Irisdown",
+      moduleId: "irisdown-countdowntimer",
+      moduleVersion: "2.0.0",
+      upgradeIndex: 0,
+      // 1 Upgrade-Skript
+      role: "timer",
+      defaultLabel: "timer",
+      defaultHost: "127.0.0.1",
+      hint: "In Irisdown Countdown Timer: Settings → Remote Control (TCP) aktivieren.",
+      params: [
+        { id: "presets", label: "Zeit-Tasten (Minuten oder hh:mm:ss, mit Komma)", type: "list", default: "5,10,15,30" },
+        { id: "jog", label: "Minuten pro Rasterschritt", type: "number", default: 1, min: 1, max: 10 }
+      ],
+      config: (d) => ({ host: d.host || "127.0.0.1" })
+    },
+    rp150: rpType("AW-RP150"),
+    rp200: rpType("AW-RP200")
+  };
+  function rpType(model) {
+    return {
+      short: model.replace("AW-", ""),
+      name: model,
+      vendor: "Panasonic",
+      moduleId: "panasonic-camera-controller",
+      moduleVersion: model === "AW-RP200" ? "2.2.1" : "2.1.1",
+      upgradeIndex: 0,
+      // Optionen im Format von 2.1.1; 2.2.x wandelt per Upgrade-Skript um
+      role: "rp",
+      defaultLabel: model === "AW-RP200" ? "rp200" : "rp150",
+      defaultHost: "192.168.0.200",
+      hint: model === "AW-RP200" ? "AW-RP200 wird erst ab Modulversion 2.2 unterstützt – die braucht Companion 5.0 oder neuer. Benutzer/Passwort des RP200 nach dem Import in Companion eintragen (werden hier bewusst nicht gespeichert)." : "Steuert den Controller selbst: Kamerawahl, Preset- und Tracing-Memory.",
+      params: [
+        { id: "cameras", label: "Kamera-Tasten", type: "number", default: 8, min: 1, max: 32 },
+        { id: "pmem", label: "Preset-Memory-Tasten (PMEM)", type: "number", default: 8, min: 0, max: 100 },
+        { id: "tmem", label: "Tracing-Memory-Tasten (TMEM)", type: "number", default: 4, min: 0, max: 10 }
+      ],
+      config: (d) => ({
+        model,
+        host: d.host || "",
+        port: 80,
+        polling: true,
+        polldelay: 100
+      })
+    };
+  }
+  function newDevice(type, existing = []) {
+    const t = DEVICE_TYPES[type];
+    const params = {};
+    for (const p of t.params) params[p.id] = p.default;
+    let n = existing.filter((d) => d.type === type).length + 1;
+    let label = type === "ptz" ? `cam${n}` : n > 1 ? `${t.defaultLabel}${n}` : t.defaultLabel;
+    while (existing.some((d) => d.label === label)) label = `${t.defaultLabel}${++n}`;
+    if (type === "ptz") params.title = `CAM ${n}`;
+    return {
+      id: `kb_${type}_${Math.random().toString(36).slice(2, 8)}`,
+      type,
+      label,
+      host: t.defaultHost,
+      params,
+      source: "manual"
+    };
+  }
+  function cleanLabel(s) {
+    return String(s || "").trim().replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "device";
+  }
+  var listParam = (v2) => String(v2 ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+
+  // js/model.js
+  var FILE_VERSION = 12;
+  var counter = 0;
+  function uid(prefix = "") {
+    counter = (counter + 1) % 1e6;
+    const rnd = (crypto?.getRandomValues ? Array.from(crypto.getRandomValues(new Uint8Array(9))) : Array.from({ length: 9 }, () => Math.floor(Math.random() * 256))).map((b) => "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"[b & 63]).join("");
+    return prefix + rnd + counter.toString(36);
+  }
+  var val = (value) => ({ isExpression: false, value });
+  var expr = (value) => ({ isExpression: true, value: String(value) });
+  var isWrapped = (v2) => !!v2 && typeof v2 === "object" && "isExpression" in v2 && typeof v2.isExpression === "boolean";
+  function wrapOptions(opts = {}) {
+    const res = {};
+    for (const [k, v2] of Object.entries(opts)) res[k] = isWrapped(v2) ? v2 : val(v2);
+    return res;
+  }
+  function action(dev, definitionId, options = {}) {
+    return {
+      type: "action",
+      id: uid(),
+      definitionId,
+      connectionId: dev.id,
+      options: wrapOptions(options),
+      upgradeIndex: dev.upgradeIndex
+    };
+  }
+  function feedback(dev, definitionId, options = {}, style) {
+    const fb = {
+      type: "feedback",
+      id: uid(),
+      definitionId,
+      connectionId: dev.id,
+      options: wrapOptions(options),
+      isInverted: val(false),
+      upgradeIndex: dev.upgradeIndex
+    };
+    if (style) fb.style = style;
+    return fb;
+  }
+  var INTERNAL = { id: "internal", upgradeIndex: void 0 };
+  var internal = {
+    wait: (ms) => strip(action(INTERNAL, "wait", { time: expr(ms) })),
+    setVar: (name, value, isExpr = false) => strip(action(INTERNAL, "custom_variable_set_value", { name, create: true, value: isExpr ? expr(value) : String(value) })),
+    setPage: (page) => strip(action(INTERNAL, "set_page", { surfaceId: "self", page: Number(page) })),
+    /** Logic: If – condition = boolean feedbacks, then/else = actions */
+    ifThen: (conditions, thenActions, elseActions = []) => ({
+      ...strip(action(INTERNAL, "logic_if", {})),
+      children: { condition: conditions, actions: thenActions, else_actions: elseActions }
+    }),
+    checkExpr: (expression, style) => strip(feedback(INTERNAL, "check_expression", { expression }, style)),
+    /** Aktionen strikt nacheinander ausführen */
+    sequence: (actions) => ({
+      ...strip(action(INTERNAL, "action_group", { execution_mode: "sequential" })),
+      children: { default: actions }
+    })
+  };
+  function strip(e) {
+    delete e.upgradeIndex;
+    return e;
+  }
+  var COLORS = {
+    black: 0,
+    white: 16777215,
+    red: 16711680,
+    green: 51200,
+    brightGreen: 65280,
+    yellow: 16763904,
+    amber: 16746496,
+    blue: 20680,
+    darkBlue: 10854,
+    grey: 4210752,
+    darkGrey: 2105376,
+    purple: 8007615,
+    teal: 31354
+  };
+  function makeButton(b) {
+    const rotary = !!b.rotary;
+    const sets = { down: b.down || [], up: b.up || [] };
+    if (rotary) {
+      sets.rotate_left = b.left || [];
+      sets.rotate_right = b.right || [];
+    }
+    return {
+      type: "button",
+      style: {
+        text: b.text ?? "",
+        textExpression: !!b.textExpression,
+        size: b.size ?? "auto",
+        png64: null,
+        alignment: "center:center",
+        pngalignment: "center:center",
+        color: b.color ?? COLORS.white,
+        bgcolor: b.bgcolor ?? COLORS.black,
+        show_topbar: b.topbar ?? "default"
+      },
+      options: { stepProgression: "auto", rotaryActions: rotary },
+      feedbacks: b.feedbacks || [],
+      steps: {
+        0: { action_sets: sets, options: { runWhileHeld: [] } }
+      },
+      localVariables: []
+    };
+  }
+
+  // js/templates.js
+  var dim = { pgm: 3801088, pvw: 14848, trans: 1973790, fn: 1056826, audio: 2759226, cam: 1710618, preset: 993834, router: 2761744 };
+  var v = (dev, name) => `$(${dev.label}:${name})`;
+  var RED = { bgcolor: COLORS.red, color: COLORS.white };
+  var GREEN = { bgcolor: COLORS.green, color: COLORS.white };
+  var YELLOW = { bgcolor: COLORS.yellow, color: COLORS.black };
+  function key(group, prio, btn, extra = {}) {
+    return { group, prio, btn, ...extra };
+  }
+  var MIXERS = {
+    vmix: {
+      sources(dev) {
+        const names = listParam(dev.params.inputNames);
+        const n = Number(dev.params.inputs) || 8;
+        return Array.from({ length: n }, (_, i) => ({ id: i + 1, label: names[i] || `${i + 1}
+${v(dev, `input_${i + 1}_name`)}` }));
+      },
+      pgm: (dev, s) => ({
+        text: s.label,
+        bgcolor: dim.pgm,
+        down: [action(dev, "programCut", { mix: 1, input: String(s.id) })],
+        feedbacks: [feedback(dev, "inputLive", { mix: 1, input: String(s.id), fg: COLORS.white, bg: COLORS.red, tally: "" })],
+        info: `PGM Input ${s.id}`
+      }),
+      pvw: (dev, s) => ({
+        text: s.label,
+        bgcolor: dim.pvw,
+        down: [action(dev, "previewInput", { mix: 1, input: String(s.id) })],
+        feedbacks: [feedback(dev, "inputPreview", { mix: 1, input: String(s.id), fg: COLORS.white, bg: COLORS.green, tally: "" })],
+        info: `PVW Input ${s.id}`
+      }),
+      cut: (dev) => ({ text: "CUT", size: 24, bgcolor: dim.trans, down: [action(dev, "transitionMix", { mix: 1, functionID: "Cut", duration: "1000", input: "" })] }),
+      auto: (dev) => ({ text: "AUTO", size: 24, bgcolor: dim.trans, down: [action(dev, "transition", { functionID: "Transition1", mix: 1 })], info: "vMix Transition 1" }),
+      ftb: (dev) => ({
+        text: "FTB",
+        size: 24,
+        bgcolor: dim.trans,
+        down: [action(dev, "fadeToBlack", {})],
+        feedbacks: [feedback(dev, "status", { status: "fadeToBlack", value: "" }, RED)]
+      }),
+      extras(dev) {
+        const out = [];
+        const ov = Number(dev.params.overlays) || 0;
+        for (let i = 1; i <= ov; i++)
+          out.push({
+            text: `OVL ${i}`,
+            bgcolor: dim.fn,
+            down: [action(dev, "overlayFunctions", { type: "OverlayInput", input: "", overlay: String(i), mix: [1] })],
+            feedbacks: [feedback(dev, "overlayStatus", { input: "", overlay: String(i), fg: COLORS.white, bgPreview: COLORS.green, bgProgram: COLORS.red })],
+            info: `Overlay ${i} an/aus (Input aus Preview)`
+          });
+        return out;
+      },
+      recStream: (dev) => [
+        {
+          text: "REC",
+          bgcolor: dim.fn,
+          down: [action(dev, "recordingFunctions", { functionID: "StartStopRecording" })],
+          feedbacks: [feedback(dev, "status", { status: "recording", value: "" }, RED)]
+        },
+        {
+          text: "STREAM",
+          bgcolor: dim.fn,
+          down: [action(dev, "streamingFunctions", { functionID: "StartStopStreaming", value: "" })],
+          feedbacks: [feedback(dev, "status", { status: "streaming", value: "" }, RED)]
+        }
+      ],
+      tally: (dev, ref) => ref ? [feedback(dev, "inputLive", { mix: 1, input: String(ref), fg: COLORS.white, bg: COLORS.red, tally: "" })] : [],
+      audioEncoders(dev) {
+        const step = String(Number(dev.params.volStep) || 2);
+        const enc = [];
+        for (const bus of listParam(dev.params.buses)) {
+          enc.push({
+            text: `${bus === "Master" ? "MASTER" : "BUS " + bus}
+${v(dev, `bus_${bus.toLowerCase()}_volume`)}`,
+            left: [action(dev, "setBusVolume", { value: bus, adjustment: "Decrease", amount: step })],
+            right: [action(dev, "setBusVolume", { value: bus, adjustment: "Increase", amount: step })],
+            push: [action(dev, "busXAudio", { value: bus, functionID: "BusXAudio" })],
+            feedbacks: [feedback(dev, "busMute", { value: bus }, RED)],
+            info: `Bus ${bus}: Lautstärke ±${step}, Drücken = Mute`
+          });
+        }
+        return enc;
+      },
+      inputAudioEncoders(dev) {
+        const step = String(Number(dev.params.volStep) || 2);
+        const n = Number(dev.params.audioInputs) || 0;
+        return Array.from({ length: n }, (_, i) => {
+          const input = String(i + 1);
+          return {
+            text: `IN ${input}
+${v(dev, `input_${input}_volume`)}`,
+            left: [action(dev, "setInputVolume", { input, adjustment: "Decrease", amount: step })],
+            right: [action(dev, "setInputVolume", { input, adjustment: "Increase", amount: step })],
+            push: [action(dev, "audio", { input, functionID: "Audio" })],
+            feedbacks: [feedback(dev, "inputAudio", { input }, RED)],
+            info: `Input ${input}: Lautstärke ±${step}, Drücken = Mute`
+          };
+        });
+      },
+      muteKeys(dev) {
+        const keys = [];
+        for (const bus of listParam(dev.params.buses))
+          keys.push({
+            text: `MUTE
+${bus === "Master" ? "MASTER" : "BUS " + bus}`,
+            bgcolor: dim.audio,
+            down: [action(dev, "busXAudio", { value: bus, functionID: "BusXAudio" })],
+            feedbacks: [feedback(dev, "busMute", { value: bus }, RED)]
+          });
+        const n = Number(dev.params.audioInputs) || 0;
+        for (let i = 1; i <= n; i++)
+          keys.push({
+            text: `MUTE ${i}
+${v(dev, `input_${i}_name`)}`,
+            bgcolor: dim.audio,
+            down: [action(dev, "audio", { input: String(i), functionID: "Audio" })],
+            feedbacks: [feedback(dev, "inputAudio", { input: String(i) }, RED)]
+          });
+        return keys;
+      }
+    },
+    atem: {
+      sources(dev) {
+        const n = Number(dev.params.inputs) || 8;
+        return Array.from({ length: n }, (_, i) => ({ id: i + 1, label: v(dev, `short_${i + 1}`) }));
+      },
+      pgm: (dev, s) => ({
+        text: s.label,
+        bgcolor: dim.pgm,
+        down: [action(dev, "program", { mixeffect: Number(dev.params.me) || 1, input: s.id })],
+        feedbacks: [feedback(dev, "program", { mixeffect: Number(dev.params.me) || 1, input: s.id }, RED)],
+        info: `PGM Input ${s.id}`
+      }),
+      pvw: (dev, s) => ({
+        text: s.label,
+        bgcolor: dim.pvw,
+        down: [action(dev, "preview", { mixeffect: Number(dev.params.me) || 1, input: s.id })],
+        feedbacks: [feedback(dev, "preview", { mixeffect: Number(dev.params.me) || 1, input: s.id }, GREEN)],
+        info: `PVW Input ${s.id}`
+      }),
+      cut: (dev) => ({ text: "CUT", size: 24, bgcolor: dim.trans, down: [action(dev, "cut", { mixeffect: Number(dev.params.me) || 1 })] }),
+      auto: (dev) => ({
+        text: "AUTO",
+        size: 24,
+        bgcolor: dim.trans,
+        down: [action(dev, "auto", { mixeffect: Number(dev.params.me) || 1 })],
+        feedbacks: [feedback(dev, "inTransition", { mixeffect: Number(dev.params.me) || 1 }, RED)]
+      }),
+      ftb: (dev) => ({
+        text: "FTB",
+        size: 24,
+        bgcolor: dim.trans,
+        down: [action(dev, "fadeToBlackAuto", { mixeffect: Number(dev.params.me) || 1 })],
+        feedbacks: [
+          feedback(dev, "fadeToBlackIsBlack", { mixeffect: Number(dev.params.me) || 1, state: "on" }, RED),
+          feedback(dev, "fadeToBlackIsBlack", { mixeffect: Number(dev.params.me) || 1, state: "fading" }, YELLOW)
+        ]
+      }),
+      extras(dev) {
+        const out = [];
+        for (let k = 1; k <= (Number(dev.params.dsks) || 0); k++)
+          out.push({
+            text: `DSK ${k}`,
+            bgcolor: dim.fn,
+            down: [action(dev, "dskOnAir", { onair: "toggle", key: k })],
+            feedbacks: [feedback(dev, "dskOnAir", { key: k }, RED)]
+          });
+        for (let m = 1; m <= (Number(dev.params.macros) || 0); m++)
+          out.push({
+            text: v(dev, `macro_${m}`),
+            bgcolor: dim.fn,
+            down: [action(dev, "macrorun", { macro: m, action: "runContinue" })],
+            feedbacks: [
+              feedback(dev, "macro", { macroIndex: m, state: "isUsed" }, { bgcolor: 238, color: COLORS.white }),
+              feedback(dev, "macro", { macroIndex: m, state: "isRunning" }, GREEN),
+              feedback(dev, "macro", { macroIndex: m, state: "isWaiting" }, YELLOW)
+            ],
+            info: `Makro ${m}`
+          });
+        return out;
+      },
+      recStream: (dev) => dev.params.recStream === false ? [] : [
+        {
+          text: "REC",
+          bgcolor: dim.fn,
+          down: [action(dev, "recordStartStop", { record: "toggle" })],
+          feedbacks: [feedback(dev, "recordStatus", { state: 1 }, RED), feedback(dev, "recordStatus", { state: 128 }, YELLOW)]
+        },
+        {
+          text: "STREAM",
+          bgcolor: dim.fn,
+          down: [action(dev, "streamStartStop", { stream: "toggle" })],
+          feedbacks: [
+            feedback(dev, "streamStatus", { state: 4 }, RED),
+            feedback(dev, "streamStatus", { state: 2 }, YELLOW),
+            feedback(dev, "streamStatus", { state: 32 }, YELLOW)
+          ]
+        }
+      ],
+      tally: (dev, ref) => ref && !isNaN(Number(ref)) ? [feedback(dev, "program", { mixeffect: Number(dev.params.me) || 1, input: Number(ref) }, RED)] : [],
+      audioEncoders(dev) {
+        if (dev.params.fairlight === false) return [];
+        const step = Number(dev.params.gainStep) || 1;
+        const fade = { fadeDuration: 0, fadeAlgorithm: "linear", fadeCurve: "ease-in" };
+        return [
+          {
+            text: `MASTER
+${v(dev, "audio_master_faderGain")}`,
+            left: [action(dev, "fairlightAudioMasterGainDelta", { delta: -step, ...fade })],
+            right: [action(dev, "fairlightAudioMasterGainDelta", { delta: step, ...fade })],
+            push: [],
+            feedbacks: [],
+            info: `Master-Fader ±${step} dB`
+          }
+        ];
+      },
+      inputAudioEncoders(dev) {
+        if (dev.params.fairlight === false) return [];
+        const step = Number(dev.params.gainStep) || 1;
+        const fade = { fadeDuration: 0, fadeAlgorithm: "linear", fadeCurve: "ease-in" };
+        const n = Number(dev.params.audioInputs) || 0;
+        return Array.from({ length: n }, (_, i) => {
+          const input = i + 1;
+          const src = "-65280";
+          return {
+            text: `IN ${input}
+${v(dev, `audio_input_${input}_faderGain`)}`,
+            left: [action(dev, "fairlightAudioFaderGainDelta", { input, source: src, delta: -step, ...fade })],
+            right: [action(dev, "fairlightAudioFaderGainDelta", { input, source: src, delta: step, ...fade })],
+            push: [action(dev, "fairlightAudioMixOption", { input, source: src, option: "toggle" })],
+            feedbacks: [feedback(dev, "fairlightAudioMixOption", { input, source: src, option: "off" }, RED)],
+            info: `Input ${input}: Fader ±${step} dB, Drücken = On/Off`
+          };
+        });
+      },
+      muteKeys(dev) {
+        if (dev.params.fairlight === false) return [];
+        const n = Number(dev.params.audioInputs) || 0;
+        return Array.from({ length: n }, (_, i) => ({
+          text: `ON/OFF
+${v(dev, `short_${i + 1}`)}`,
+          bgcolor: dim.audio,
+          down: [action(dev, "fairlightAudioMixOption", { input: i + 1, source: "-65280", option: "toggle" })],
+          feedbacks: [feedback(dev, "fairlightAudioMixOption", { input: i + 1, source: "-65280", option: "on" }, GREEN)]
+        }));
+      }
+    },
+    kairos: {
+      sources(dev) {
+        return listParam(dev.params.sources).map((name) => ({ id: name, label: name }));
+      },
+      pgm: (dev, s) => ({
+        text: s.label,
+        bgcolor: dim.pgm,
+        down: [action(dev, "forceSource", { layer: `${dev.params.scene}.Layers.${dev.params.layer}`, sourceAB: "sourceA", source: s.id })],
+        feedbacks: [feedback(dev, "inputSource", { layer: `/${dev.params.scene}/${dev.params.layer}`, sourceAB: "sourceA", source: s.id }, RED)],
+        info: `${dev.params.scene}/${dev.params.layer} Source A = ${s.id}`
+      }),
+      pvw: (dev, s) => ({
+        text: s.label,
+        bgcolor: dim.pvw,
+        down: [action(dev, "forceSource", { layer: `${dev.params.scene}.Layers.${dev.params.layer}`, sourceAB: "sourceB", source: s.id })],
+        feedbacks: [feedback(dev, "inputSource", { layer: `/${dev.params.scene}/${dev.params.layer}`, sourceAB: "sourceB", source: s.id }, GREEN)],
+        info: `${dev.params.scene}/${dev.params.layer} Source B = ${s.id}`
+      }),
+      cut: (dev) => ({ text: "CUT", size: 24, bgcolor: dim.trans, down: [action(dev, "programCut", { scene: dev.params.scene })] }),
+      auto: (dev) => ({ text: "AUTO", size: 24, bgcolor: dim.trans, down: [action(dev, "programAuto", { scene: dev.params.scene })] }),
+      ftb: () => null,
+      extras: () => [],
+      recStream: () => [],
+      tally: (dev, ref) => ref ? [feedback(dev, "inputSource", { layer: `/${dev.params.scene}/${dev.params.layer}`, sourceAB: "sourceA", source: String(ref) }, RED)] : [],
+      audioEncoders: () => [],
+      inputAudioEncoders: () => [],
+      muteKeys: () => []
+    }
+  };
+  var mixerApi = (dev) => MIXERS[dev.type];
+  var PPT = {
+    prev: (dev) => ({ text: "◀\nZURÜCK", size: 18, bgcolor: dim.trans, down: [action(dev, "previous", {})] }),
+    next: (dev) => ({ text: "WEITER\n▶", size: 18, bgcolor: 997914, down: [action(dev, "next", {})], feedbacks: [feedback(dev, "showState", { state: "running" }, { bgcolor: 32811, color: COLORS.white })], info: "Nächste Folie/Animation (grün = Bildschirmpräsentation läuft)" }),
+    info: (dev) => ({ text: `FOLIE
+${v(dev, "currentSlide")}/${v(dev, "slideCount")}`, size: 14, bgcolor: 1052688, info: "Aktuelle Folie / Anzahl / verbleibend" }),
+    start: (dev) => ({ text: "START", bgcolor: dim.fn, down: [action(dev, "start_slideshow", { startPosition: "currentSlide", sectionName: "Default Section", slideNumber: 1 })], feedbacks: [feedback(dev, "showState", { state: "running" }, GREEN)], info: "Bildschirmpräsentation ab aktueller Folie starten" }),
+    end: (dev) => ({ text: "ENDE", bgcolor: dim.fn, down: [action(dev, "end_slideshow", {})], feedbacks: [feedback(dev, "showState", { state: "edit" }, { bgcolor: 4210752, color: COLORS.white })] }),
+    black: (dev) => ({ text: "BLACK", bgcolor: 0, down: [action(dev, "black_screen", { action: "toggle" })], info: "Schwarzbild an/aus" }),
+    media: (dev) => ({ text: `▶ ❚❚
+${v(dev, "mediaRemainingFormatted")}`, size: 14, bgcolor: dim.fn, down: [action(dev, "mediaTransport", { action: "playpause" })], feedbacks: [feedback(dev, "mediaState", { state: "playing" }, GREEN), feedback(dev, "mediaState", { state: "paused" }, YELLOW)], info: "Video auf der Folie: Play/Pause, Restzeit" })
+  };
+  var MITTI = {
+    go: (dev) => ({ text: "GO", size: 30, bgcolor: 997914, down: [action(dev, "play", {})], feedbacks: [feedback(dev, "playStatus", { playPause: "Playing" }, { bgcolor: 43066, color: COLORS.white })], info: "Play (grün = läuft)" }),
+    pause: (dev) => ({ text: "❚❚", size: 24, bgcolor: dim.trans, down: [action(dev, "toggle_play", {})], feedbacks: [feedback(dev, "playStatus", { playPause: "Paused" }, YELLOW)], info: "Pause/Weiter" }),
+    stop: (dev) => ({ text: "REWIND", bgcolor: dim.trans, down: [action(dev, "rewind", {})], info: "Zurück an Cue-Anfang" }),
+    panic: (dev) => ({ text: "PANIC", bgcolor: 6684672, down: [action(dev, "panic", {})] }),
+    prev: (dev) => ({ text: "◀ CUE", bgcolor: dim.trans, down: [action(dev, "jump_prev", {})], info: "Vorheriger Cue" }),
+    next: (dev) => ({ text: "CUE ▶", bgcolor: dim.trans, down: [action(dev, "jump_next", {})], info: "Nächster Cue" }),
+    info: (dev) => ({ text: `${v(dev, "currentCueName")}
+-${v(dev, "cueTimeLeft_hhmmss")}`, size: 14, bgcolor: 1052688, feedbacks: [feedback(dev, "timeRemaining", { time: 10 }, RED)], info: "Laufender Cue + Restzeit (rot = letzte 10 s)" }),
+    extras: (dev) => [
+      { text: `NEXT
+${v(dev, "nextCueName")}`, size: 14, bgcolor: 1052688, down: [action(dev, "play_select", { forceCut: false })], info: "Nächster Cue (Drücken = ausgewählten Cue spielen)" },
+      { text: "GOTO\n-10", bgcolor: dim.trans, down: [action(dev, "goto_10", {})] },
+      { text: "GOTO\n-30", bgcolor: dim.trans, down: [action(dev, "goto_30", {})] },
+      { text: "FULL\nSCREEN", bgcolor: dim.fn, down: [action(dev, "fullscreenToggle", {})] },
+      { text: "VIDEO\nOUT", bgcolor: dim.fn, down: [action(dev, "toggleVideoOutputs", {})], feedbacks: [feedback(dev, "videoOutputs", {}, GREEN)] }
+    ],
+    cue: (dev, id) => ({
+      text: `CUE ${id}`,
+      size: 18,
+      bgcolor: dim.cam,
+      down: [action(dev, "play_cue", { cuenumber: id, forceCut: false })],
+      feedbacks: [feedback(dev, "selectedCueID", { cueID: id }, YELLOW), feedback(dev, "playingCueID", { cueID: id }, { bgcolor: 43066, color: COLORS.white })],
+      info: `Cue ${id} spielen (gelb = ausgewählt, grün = läuft)`
+    }),
+    encoders: (dev) => {
+      const s = Math.max(1, Number(dev.params.scrub) || 2);
+      const tc = `${String(s).padStart(2, "0")}:00`;
+      const db = Number(dev.params.volStep) || 1;
+      return [
+        { name: "CUE", text: `CUE
+${v(dev, "selectedCueName")}`, left: [action(dev, "select_prev", {})], right: [action(dev, "select_next", {})], push: [action(dev, "play_select", { forceCut: false })], info: "Cue auswählen, Drücken = spielen" },
+        { name: "PLAYHEAD", text: `PLAYHEAD
+${v(dev, "cueTimeElapsed_hhmmss")}`, left: [action(dev, "scrubPlayhead", { value: `-${tc}` })], right: [action(dev, "scrubPlayhead", { value: `+${tc}` })], push: [action(dev, "toggle_play", {})], feedbacks: [feedback(dev, "playStatus", { playPause: "Playing" }, GREEN)], info: `Playhead ±${s} s, Drücken = Pause/Weiter` },
+        { name: "VOLUME", text: `VOLUME
+${v(dev, "currentCueVolume")}`, left: [action(dev, "adjustVolume", { value: -db })], right: [action(dev, "adjustVolume", { value: db })], push: [action(dev, "toggleAudio", { cuenumber: "current" })], info: `Cue-Lautstärke ±${db} dB, Drücken = Audio an/aus` }
+      ];
+    }
+  };
+  var qopt = (scope, extra = {}) => ({ scope, q_num: "", q_id: "", ...extra });
+  var QLAB = {
+    go: (dev) => ({
+      text: `GO
+${v(dev, "n_num")}`,
+      size: 24,
+      bgcolor: 997914,
+      down: [action(dev, "go", {})],
+      feedbacks: [feedback(dev, "min_go", { goMode: "1" }, { bgcolor: 6684672, color: COLORS.white })],
+      info: "GO (rot = Minimum-Go-Sperre aktiv)"
+    }),
+    pause: (dev) => ({ text: "❚❚", size: 24, bgcolor: dim.trans, down: [action(dev, "new_togglePause", qopt("R"))], feedbacks: [feedback(dev, "q_paused", qopt("R"), { bgcolor: 6684774, color: COLORS.white })], info: "Laufende Cues pausieren/fortsetzen" }),
+    stop: (dev) => ({ text: "STOP", bgcolor: dim.trans, down: [action(dev, "stop", {})], feedbacks: [feedback(dev, "any_run", {}, RED)], info: "Alles stoppen (rot = etwas läuft)" }),
+    panic: (dev) => ({ text: "PANIC", bgcolor: 6684672, down: [action(dev, "panic", {})] }),
+    prev: (dev) => ({ text: "◀ CUE", bgcolor: dim.trans, down: [action(dev, "previous", { seq: false })] }),
+    next: (dev) => ({ text: "CUE ▶", bgcolor: dim.trans, down: [action(dev, "next", { seq: false })] }),
+    info: (dev) => ({ text: `${v(dev, "r_name")}
+-${v(dev, "r_hhmmss")}`, size: 14, bgcolor: 1052688, info: "Laufender Cue + Restzeit" }),
+    extras: (dev) => [
+      { text: `NEXT
+${v(dev, "n_name")}`, size: 14, bgcolor: 1052688, info: "Cue am Playhead" },
+      { text: "RESET", bgcolor: dim.fn, down: [action(dev, "reset", {})] },
+      { text: "LOAD", bgcolor: dim.fn, down: [action(dev, "load", {})] }
+    ],
+    cue: (dev, num) => ({
+      text: `Q ${num}`,
+      size: 18,
+      bgcolor: dim.cam,
+      down: [action(dev, "start", { cue: num })],
+      feedbacks: [feedback(dev, "q_run", { cue: num }, { bgcolor: 43066, color: COLORS.white })],
+      info: `Cue ${num} starten (grün = läuft)`
+    }),
+    encoders: (dev) => [
+      { name: "PLAYHEAD", text: `PLAYHEAD
+${v(dev, "n_num")} ${v(dev, "n_name")}`, left: [action(dev, "previous", { seq: false })], right: [action(dev, "next", { seq: false })], push: [action(dev, "go", {})], info: "Playhead bewegen, Drücken = GO" },
+      { name: "PREWAIT", text: `PREWAIT
+${v(dev, "n_preWait")}`, left: [action(dev, "prewait_dec", { time: "1" })], right: [action(dev, "prewait_inc", { time: "1" })], push: [], info: "Pre-Wait des gewählten Cues ±1 s" }
+    ]
+  };
+  var TIMER = {
+    stateFb: (dev) => feedback(dev, "state_color", { run_fg: COLORS.white, run_bg: 26112, pause_fg: COLORS.black, pause_bg: COLORS.yellow }),
+    display: (dev) => ({ text: v(dev, "time"), size: "auto", bgcolor: 1052688, feedbacks: [TIMER.stateFb(dev)], info: "Restzeit (grün = läuft, gelb = Pause)" }),
+    toggle: (dev) => ({ text: "▶ ❚❚", size: 24, bgcolor: dim.trans, down: [action(dev, "togglePause", {})], feedbacks: [TIMER.stateFb(dev)], info: "Start/Pause" }),
+    reset: (dev) => ({ text: "RESET", bgcolor: 5046272, down: [action(dev, "reset", {})] }),
+    jog: (dev, n) => {
+      const m = (Number(dev.params.jog) || 1) * n;
+      return { text: `${m > 0 ? "+" : ""}${m} MIN`, bgcolor: dim.fn, down: [action(dev, "jog", { minutes: String(m) })] };
+    }
+  };
+  var TEMPLATES = {
+    mixer: {
+      name: "Bildmischer",
+      describe: "PGM- und PVW-Reihe mit Tally, CUT/AUTO/FTB, Keyer/Overlays, REC/STREAM; Drehregler = Audio-Master/Busse",
+      deviceRole: "mixer",
+      build({ dev, rowWidth: rowWidth2, keyCount }) {
+        const m = mixerApi(dev);
+        const src = m.sources(dev).slice(0, Math.max(1, rowWidth2));
+        const keys = [];
+        if (keyCount <= 10) {
+          src.forEach((s) => {
+            const b = m.pvw(dev, s);
+            b.feedbacks = [...b.feedbacks, ...m.tally(dev, s.id)];
+            b.info += " · rot = auf Programm";
+            keys.push(key("pvw", 2, b, { row: true }));
+          });
+        } else {
+          src.forEach((s) => keys.push(key("pgm", 3, m.pgm(dev, s), { row: true })));
+          src.forEach((s) => keys.push(key("pvw", 2, m.pvw(dev, s), { row: true })));
+        }
+        keys.push(key("trans", 1, m.cut(dev)));
+        keys.push(key("trans", 1, m.auto(dev)));
+        const ftb = m.ftb(dev);
+        if (ftb) keys.push(key("trans", 4, ftb));
+        m.extras(dev).forEach((b) => keys.push(key("trans", 5, b)));
+        m.recStream(dev).forEach((b) => keys.push(key("trans", 6, b)));
+        return { title: DEVICE_TYPES[dev.type].name, keys, encoders: m.audioEncoders(dev) };
+      }
+    },
+    audio: {
+      name: "Audio",
+      describe: "Mute-Tasten mit Rückmeldung; Drehregler = Input-Lautstärken (Drücken = Mute)",
+      deviceRole: "mixer",
+      deviceTypes: ["vmix", "atem"],
+      build({ dev }) {
+        const m = mixerApi(dev);
+        const keys = m.muteKeys(dev).map((b) => key("mute", 1, b));
+        return { title: "Audio", keys, encoders: [...m.inputAudioEncoders(dev), ...m.audioEncoders(dev)] };
+      }
+    },
+    ptz: {
+      name: "PTZ-Steuerung",
+      describe: "Kamera-Auswahl (mit Tally vom Mischer), Presets mit Rückmeldung + STORE-Modus; Drehregler = Zoom/Fokus/Iris/Gain der gewählten Kamera",
+      deviceRole: "ptz",
+      multiDevice: true,
+      build({ cams, mixer, rp, hasEncoders, keyCount }) {
+        const keys = [];
+        const sel = "$(custom:ptz_sel)";
+        const store2 = "$(custom:ptz_store)";
+        const forCam = (fn) => cams.map((cam, i) => internal.ifThen([internal.checkExpr(`${sel} == ${i + 1}`)], fn(cam, i + 1)));
+        cams.forEach((cam, i) => {
+          const tally = mixer ? mixerApi(mixer).tally(mixer, cam.params.tallyInput) : [];
+          keys.push(
+            key(
+              "cams",
+              1,
+              {
+                text: cam.params.title || cam.label,
+                size: 18,
+                bgcolor: dim.cam,
+                down: [internal.setVar("ptz_sel", i + 1), ...rp ? [action(rp, "selectCamera", { camera: Number(cam.params.rpCam) || i + 1 })] : []],
+                feedbacks: [internal.checkExpr(`${sel} == ${i + 1}`, YELLOW), ...tally],
+                info: `Wählt ${cam.params.title || cam.label} (custom:ptz_sel = ${i + 1})${tally.length ? ", Tally vom Mischer" : ""}${rp ? `, ${rp.label} schaltet auf Kamera ${Number(cam.params.rpCam) || i + 1}` : ""}`
+              },
+              { row: true }
+            )
+          );
+        });
+        const nPresets = Math.max(...cams.map((c) => Number(c.params.presets) || 8));
+        for (let p = 1; p <= nPresets; p++) {
+          const pp = String(p - 1).padStart(2, "0");
+          const active = cams.map((c, i) => `(${sel} == ${i + 1} && $(custom:ptz_c${i + 1}_pst) == ${p})`).join(" || ");
+          keys.push(
+            key("presets", p <= 4 ? 2 : 3.5, {
+              text: `PST
+${p}`,
+              size: 18,
+              bgcolor: dim.preset,
+              down: [
+                internal.ifThen(
+                  [internal.checkExpr(`${store2} == 1`)],
+                  [...forCam((cam) => [action(cam, "savePset", { val: pp })]), internal.setVar("ptz_store", 0)],
+                  forCam((cam, c) => [action(cam, "recallPset", { val: pp }), internal.setVar(`ptz_c${c}_pst`, p)])
+                )
+              ],
+              feedbacks: [internal.checkExpr(active, GREEN), internal.checkExpr(`${store2} == 1`, { bgcolor: 6684672, color: COLORS.white })],
+              info: `Preset ${p}: Abruf auf gewählter Kamera (grün = zuletzt abgerufen). Im STORE-Modus speichern.`
+            })
+          );
+        }
+        keys.push(
+          key("lens", 3, {
+            text: "STORE",
+            bgcolor: dim.fn,
+            down: [internal.setVar("ptz_store", `${store2} == 1 ? 0 : 1`, true)],
+            feedbacks: [internal.checkExpr(`${store2} == 1`, RED)],
+            info: "STORE scharf schalten → nächste Preset-Taste speichert"
+          })
+        );
+        const lens = (t, startId, stopId, prio, opts = { liveSpeed: false }) => key(
+          "lens",
+          prio,
+          {
+            text: t,
+            bgcolor: dim.fn,
+            down: forCam((cam) => [action(cam, startId, opts)]),
+            up: forCam((cam) => [action(cam, stopId, {})]),
+            info: `${t}: gedrückt halten`
+          },
+          { cond: "noEncoders" }
+        );
+        keys.push(lens("ZOOM\nIN", "zoomI", "zoomS", 4));
+        keys.push(lens("ZOOM\nOUT", "zoomO", "zoomS", 4));
+        keys.push(lens("FOCUS\nNEAR", "focusN", "focusS", 6));
+        keys.push(lens("FOCUS\nFAR", "focusF", "focusS", 6));
+        keys.push(key("lens", 5, { text: "OTAF", bgcolor: dim.fn, down: forCam((cam) => [action(cam, "focusOTAF", {})]), info: "One-Touch-Autofocus" }));
+        if (keyCount >= 24) {
+          for (const [t, id] of [
+            ["▲", "up"],
+            ["◀", "left"],
+            ["▼", "down"],
+            ["▶", "right"]
+          ])
+            keys.push(lens(t, id, "stop", 7));
+          keys.push(key("lens", 8, { text: "HOME", bgcolor: dim.fn, down: forCam((cam) => [action(cam, "home", {})]) }));
+        }
+        const pulse = (cam) => Number(cam.params.pulse) || 120;
+        const pulseActs = (startId, stopId) => forCam((cam) => [action(cam, startId, { liveSpeed: false }), internal.wait(pulse(cam)), action(cam, stopId, {})]);
+        const camName = cams.map((c, i) => `${sel} == ${i + 1} ? '${(c.params.title || c.label).replace(/'/g, "")}'`).join(" : ") + " : '–'";
+        const encoders = [
+          { text: "ZOOM", noKeys: true, left: pulseActs("zoomO", "zoomS"), right: pulseActs("zoomI", "zoomS"), push: [], info: "Zoom (Impuls pro Raster)" },
+          {
+            text: "FOCUS",
+            noKeys: true,
+            left: pulseActs("focusN", "focusS"),
+            right: pulseActs("focusF", "focusS"),
+            push: forCam((cam) => [action(cam, "focusOTAF", {})]),
+            info: "Fokus (Impuls), Drücken = OTAF"
+          },
+          { text: "IRIS", left: forCam((cam) => [action(cam, "irisD", {})]), right: forCam((cam) => [action(cam, "irisU", {})]), push: [], info: "Iris in Stufen" },
+          {
+            text: "GAIN",
+            left: forCam((cam) => [action(cam, "gainD", {})]),
+            right: forCam((cam) => [action(cam, "gainU", {})]),
+            push: [],
+            info: "Gain in Stufen",
+            valueExpr: cams.map((c, i) => `${sel} == ${i + 1} ? $(${c.label}:gainValue)`).join(" : ") + " : ''"
+          },
+          { text: "PED", left: forCam((cam) => [action(cam, "pedD", {})]), right: forCam((cam) => [action(cam, "pedU", {})]), push: [], info: "Pedestal (Schwarzwert)" },
+          { text: "P/T SPEED", left: forCam((cam) => [action(cam, "ptSpeedD", {})]), right: forCam((cam) => [action(cam, "ptSpeedU", {})]), push: [], info: "Pan/Tilt-Geschwindigkeit" }
+        ];
+        for (const e of encoders) {
+          e.name = e.text;
+          e.textExpression = true;
+          e.text = e.valueExpr ? `'${e.text}\\n' + (${e.valueExpr})` : `'${e.text}\\n' + (${camName})`;
+          e.feedbacks = [];
+        }
+        return { title: "PTZ", keys: keys.filter((k) => !(k.cond === "noEncoders" && hasEncoders)), encoders };
+      }
+    },
+    router: {
+      name: "Kreuzschiene",
+      describe: "Ziel wählen (gelb), Quelle schalten (Tally rot); optional TAKE; Drehregler = Ziel/Quelle blättern",
+      deviceRole: "router",
+      build({ dev }) {
+        const keys = [];
+        for (const d of listParam(dev.params.destinations).map(Number).filter((n) => n > 0))
+          keys.push(
+            key(
+              "dest",
+              1,
+              {
+                text: `→ ${v(dev, `output_${d}`)}`,
+                bgcolor: dim.router,
+                down: [action(dev, "select_destination", { destination: d })],
+                feedbacks: [feedback(dev, "selected_destination", { output: d }, YELLOW), feedback(dev, "take_tally_dest", { output: d }, RED)],
+                info: `Ziel Output ${d}`
+              },
+              { row: true }
+            )
+          );
+        for (const s of listParam(dev.params.sources).map(Number).filter((n) => n > 0))
+          keys.push(
+            key(
+              "src",
+              2,
+              {
+                text: v(dev, `input_${s}`),
+                bgcolor: dim.cam,
+                down: [action(dev, "route_source", { source: s, ignore_lock: false })],
+                feedbacks: [feedback(dev, "selected_source", { input: s }, { bgcolor: COLORS.white, color: COLORS.black }), feedback(dev, "take_tally_source", { input: s }, RED)],
+                info: `Input ${s} auf gewähltes Ziel`
+              },
+              { row: true }
+            )
+          );
+        if (dev.params.take) {
+          keys.push(key("take", 1, { text: "TAKE", size: 24, down: [action(dev, "take", { ignore_lock: false })], feedbacks: [feedback(dev, "take", {}, RED)] }));
+          keys.push(key("take", 3, { text: "CLEAR", color: 8421504, down: [action(dev, "clear", {})] }));
+        }
+        const encoders = [
+          {
+            text: `ZIEL
+${v(dev, "selected_destination")}`,
+            left: [action(dev, "select_destination_step", { offset: -1, wrap: true })],
+            right: [action(dev, "select_destination_step", { offset: 1, wrap: true })],
+            push: [],
+            info: "Ziel blättern"
+          },
+          {
+            text: `QUELLE
+${v(dev, "selected_source")}`,
+            left: [action(dev, "route_source_step", { destination: "selected", offset: -1, wrap: true, ignore_lock: false })],
+            right: [action(dev, "route_source_step", { destination: "selected", offset: 1, wrap: true, ignore_lock: false })],
+            push: dev.params.take ? [action(dev, "take", { ignore_lock: false })] : [],
+            info: dev.params.take ? "Quelle blättern, Drücken = TAKE" : "Quelle blättern (schaltet sofort)"
+          }
+        ];
+        return { title: "Router", keys, encoders };
+      }
+    },
+    pedal: {
+      name: "Fußschalter",
+      describe: "Mischer: CUT / AUTO / FTB · PowerPoint: zurück / schwarz / weiter · Mitti/QLab: zurück / GO / STOP · Timer: Reset / Start-Pause / +1 min",
+      deviceRole: ["mixer", "presentation", "playback", "timer"],
+      build({ dev }) {
+        let keys;
+        if (dev.type === "ppt") keys = [PPT.prev(dev), PPT.black(dev), PPT.next(dev)];
+        else if (dev.type === "mitti") keys = [MITTI.prev(dev), MITTI.go(dev), MITTI.pause(dev)];
+        else if (dev.type === "qlab") keys = [QLAB.prev(dev), QLAB.go(dev), QLAB.stop(dev)];
+        else if (dev.type === "timer") keys = [TIMER.reset(dev), TIMER.toggle(dev), TIMER.jog(dev, 1)];
+        else {
+          const m = mixerApi(dev);
+          keys = [m.cut(dev), m.auto(dev), m.ftb(dev)].filter(Boolean);
+        }
+        return { title: "Pedal", keys: keys.map((b) => key("p", 1, b)), encoders: [] };
+      }
+    },
+    presentation: {
+      name: "PowerPoint",
+      describe: "Weiter/Zurück, Folienanzeige, Start/Ende, Schwarz/Weiß, Laser, Medien; Regler: Folien, Abschnitte, Medien-Playhead",
+      deviceRole: "presentation",
+      build({ dev, keyCount }) {
+        const k = [];
+        k.push(key("nav", 1, PPT.prev(dev)));
+        k.push(key("nav", 1, PPT.next(dev)));
+        k.push(key("nav", 2, PPT.info(dev)));
+        k.push(key("show", 3, PPT.start(dev)));
+        k.push(key("show", 4, PPT.end(dev)));
+        k.push(key("show", 3, PPT.black(dev)));
+        k.push(key("show", 5, { text: "WHITE", bgcolor: 3815994, down: [action(dev, "white_screen", { action: "toggle" })] }));
+        k.push(key("show", 6, { text: "LASER", bgcolor: dim.fn, down: [action(dev, "laser", { action: "toggle" })] }));
+        k.push(key("nav", 5, { text: "⏮\nERSTE", bgcolor: dim.trans, down: [action(dev, "goto_first_slide", {})] }));
+        k.push(key("nav", 6, { text: "LETZTE\n⏭", bgcolor: dim.trans, down: [action(dev, "goto_last_slide", {})] }));
+        k.push(key("media", 5, PPT.media(dev)));
+        if (keyCount >= 24) {
+          k.push(key("nav", 7, { text: "◀ ABSCHN.", bgcolor: dim.trans, down: [action(dev, "previousSection", {})] }));
+          k.push(key("nav", 7, { text: "ABSCHN. ▶", bgcolor: dim.trans, down: [action(dev, "nextSection", {})] }));
+          k.push(key("info", 8, { text: `${v(dev, "sectionName")}`, size: 14, bgcolor: 2105376, info: "Aktueller Abschnitt" }));
+          k.push(key("info", 8, { text: `NOTIZ
+${v(dev, "notesSnip")}`, size: "auto", bgcolor: 2105376, info: "Anfang der Sprechernotizen" }));
+        }
+        const enc = [
+          {
+            name: "FOLIE",
+            text: `FOLIE
+${v(dev, "currentSlide")}/${v(dev, "slideCount")}`,
+            left: [action(dev, "previous", {})],
+            right: [action(dev, "next", {})],
+            push: [action(dev, "black_screen", { action: "toggle" })],
+            feedbacks: [feedback(dev, "showState", { state: "running" }, GREEN)],
+            info: "Folie zurück/weiter, Drücken = Schwarzbild",
+            noKeys: true
+          },
+          {
+            name: "ABSCHNITT",
+            text: `ABSCHNITT
+${v(dev, "sectionName")}`,
+            left: [action(dev, "previousSection", {})],
+            right: [action(dev, "nextSection", {})],
+            push: [],
+            info: "Abschnitt zurück/weiter"
+          },
+          {
+            name: "MEDIEN",
+            text: `MEDIEN
+${v(dev, "mediaRemainingFormatted")}`,
+            left: [action(dev, "mediaGotoTime", { type: "back", posMs: 5e3, posPercent: 50 })],
+            right: [action(dev, "mediaGotoTime", { type: "forward", posMs: 5e3, posPercent: 50 })],
+            push: [action(dev, "mediaTransport", { action: "playpause" })],
+            feedbacks: [feedback(dev, "mediaState", { state: "playing" }, GREEN)],
+            info: "Video ±5 s, Drücken = Play/Pause"
+          }
+        ];
+        return { title: "PPT", keys: k, encoders: enc };
+      }
+    },
+    playback: {
+      name: "Zuspieler",
+      describe: "Mitti oder QLab: GO, Pause, Stop/Panic, Vor/Zurück, Anzeige laufend/nächster Cue + Restzeit, Cue-Tasten mit Rückmeldung; Regler: Cue-Auswahl, Playhead, Lautstärke",
+      deviceRole: "playback",
+      build({ dev, keyCount }) {
+        const P2 = dev.type === "qlab" ? QLAB : MITTI;
+        const big = keyCount >= 15;
+        const k = [
+          key("main", 1, P2.go(dev), { row: big }),
+          key("main", 1, P2.pause(dev), { row: big }),
+          key("main", 2, P2.stop(dev), { row: big }),
+          key("main", 3, P2.panic(dev), { row: big }),
+          key("main", 2, P2.prev(dev), { row: big }),
+          key("main", 2, P2.next(dev), { row: big }),
+          key("main", 2, P2.info(dev), { row: big }),
+          ...P2.extras(dev).map((b) => key("extra", 6, b))
+        ];
+        const n = Number(dev.params.cues) || 0;
+        for (let i = 1; i <= n; i++) k.push(key("cues", 4 + i / 1e3, P2.cue(dev, String(i)), { row: big }));
+        return { title: dev.type === "qlab" ? "QLab" : "Mitti", keys: k, encoders: P2.encoders(dev) };
+      }
+    },
+    timer: {
+      name: "Countdown-Timer",
+      describe: "Restzeit-Anzeige (grün läuft, gelb Pause), Start/Pause, Reset, ±1 min, Zeit-Vorwahlen, Anzeigemodus; Regler: Zeit ±, Modus",
+      deviceRole: "timer",
+      build({ dev }) {
+        const k = [
+          key("main", 1, TIMER.display(dev)),
+          key("main", 1, TIMER.toggle(dev)),
+          key("main", 2, TIMER.reset(dev)),
+          key("main", 3, TIMER.jog(dev, -1)),
+          key("main", 3, TIMER.jog(dev, 1))
+        ];
+        for (const t of listParam(dev.params.presets))
+          k.push(key("presets", 4, { text: `SET
+${t}${/:/.test(t) ? "" : " MIN"}`, bgcolor: dim.preset, down: [action(dev, "resetT", { time: t })], info: `Neue Dauer ${t}` }));
+        for (const [mode, label, prio] of [["TIMER", "TIMER", 5], ["CLOCK", "UHR", 6], ["BLACK", "SCHWARZ", 5], ["TEST", "TEST", 9]])
+          k.push(key("mode", prio, { text: label, bgcolor: dim.trans, down: [action(dev, "displayM", { mode })], feedbacks: [feedback(dev, "mode_color", { mode }, { bgcolor: COLORS.blue, color: COLORS.white })], info: `Anzeigemodus ${mode}` }));
+        k.push(key("mode", 7, { text: "MSG\nAUS", bgcolor: dim.trans, down: [action(dev, "messageClear", {})], feedbacks: [feedback(dev, "message_on", {}, YELLOW)], info: "Nachricht ausblenden (gelb = Nachricht aktiv)" }));
+        const j = Number(dev.params.jog) || 1;
+        const enc = [
+          {
+            name: "ZEIT",
+            text: `ZEIT
+${v(dev, "time")}`,
+            left: [action(dev, "jog", { minutes: String(-j) })],
+            right: [action(dev, "jog", { minutes: String(j) })],
+            push: [action(dev, "togglePause", {})],
+            feedbacks: [TIMER.stateFb(dev)],
+            info: `Zeit ±${j} min, Drücken = Start/Pause`
+          },
+          {
+            name: "MODUS",
+            text: `MODUS
+${v(dev, "mode")}`,
+            left: [action(dev, "displayM", { mode: "CLOCK" })],
+            right: [action(dev, "displayM", { mode: "TIMER" })],
+            push: [action(dev, "displayM", { mode: "BLACK" })],
+            info: "links = Uhr, rechts = Timer, Drücken = Schwarz"
+          }
+        ];
+        return { title: "Timer", keys: k, encoders: enc };
+      }
+    },
+    rp: {
+      name: "RP-Controller",
+      describe: "AW-RP150/RP200: Kamerawahl mit Rückmeldung, Preset-Memory (PMEM), Tracing-Memory Standby/Play/Stop; Regler: Kamera ±, PMEM ±",
+      deviceRole: "rp",
+      build({ dev, rowWidth: rowWidth2 }) {
+        const k = [];
+        const nc = Number(dev.params.cameras) || 8;
+        for (let c = 1; c <= nc; c++)
+          k.push(
+            key("cams", c <= rowWidth2 ? 1 : 3.5, { text: `CAM
+${c}`, size: 18, bgcolor: dim.cam, down: [action(dev, "selectCamera", { camera: c })], feedbacks: [feedback(dev, "cameraSelected", { camera: c }, YELLOW)], info: `${dev.label}: Kamera ${c} wählen` }, { row: true })
+          );
+        const np = Number(dev.params.pmem) || 0;
+        for (let p = 1; p <= np; p++) {
+          const id = String(p).padStart(3, "0");
+          k.push(key("pmem", p <= rowWidth2 ? 2 : 4, { text: `PMEM
+${p}`, size: 18, bgcolor: dim.preset, down: [action(dev, "presetMemory", { preset: id })], feedbacks: [feedback(dev, "presetSelected", { pmem: id }, GREEN)], info: `Preset-Memory ${p} abrufen (grün = zuletzt)` }, { row: true }));
+        }
+        const nt = Number(dev.params.tmem) || 0;
+        for (let t = 1; t <= nt; t++) {
+          const id = String(t).padStart(3, "0");
+          k.push(key("tmem", 3, { text: `TMEM ${t}
+STBY`, size: 14, bgcolor: dim.fn, down: [action(dev, "tracingMemory", { opt: "02", trace: id })], feedbacks: [feedback(dev, "traceSelected", { tmem: id }, YELLOW)], info: `Tracing-Memory ${t}: auf Startposition fahren (Standby)` }));
+        }
+        if (nt) {
+          k.push(key("tmem", 3, { text: "TMEM\n▶ PLAY", size: 14, bgcolor: 19738, down: [action(dev, "tracingMemory", { opt: "01", trace: "001" })], info: "Tracing abspielen" }));
+          k.push(key("tmem", 3, { text: "TMEM\n■ STOP", size: 14, bgcolor: 5046272, down: [action(dev, "tracingMemory", { opt: "00", trace: "001" })], info: "Tracing stoppen" }));
+        }
+        const cv = (n) => `rp_${dev.label.replace(/-/g, "_")}_${n}`;
+        const step = (name, src, max, delta, list) => internal.sequence([
+          internal.setVar(cv(name), delta < 0 ? `max(1, $(${dev.label}:${src}) - 1)` : `min(${max}, max(0, $(${dev.label}:${src})) + 1)`, true),
+          ...list.map(([n, act]) => internal.ifThen([internal.checkExpr(`$(custom:${cv(name)}) == ${n}`)], [act]))
+        ]);
+        const camList = Array.from({ length: nc }, (_, i) => [i + 1, action(dev, "selectCamera", { camera: i + 1 })]);
+        const enc = [
+          {
+            name: "KAMERA",
+            text: `KAMERA
+${v(dev, "camera")}`,
+            left: [step("cam", "camera", nc, -1, camList)],
+            right: [step("cam", "camera", nc, 1, camList)],
+            push: [],
+            info: `Kamera am ${dev.type === "rp200" ? "RP200" : "RP150"} blättern (1…${nc})`
+          }
+        ];
+        if (np) {
+          const pmList = Array.from({ length: np }, (_, i) => [i + 1, action(dev, "presetMemory", { preset: String(i + 1).padStart(3, "0") })]);
+          enc.push({
+            name: "PMEM",
+            text: `PMEM
+${v(dev, "pmem")}`,
+            left: [step("pmem", "pmem", np, -1, pmList)],
+            right: [step("pmem", "pmem", np, 1, pmList)],
+            push: [],
+            info: `Preset-Memory blättern und abrufen (1…${np})`
+          });
+        }
+        return { title: dev.type === "rp200" ? "RP200" : "RP150", keys: k, encoders: enc };
+      }
+    },
+    empty: {
+      name: "Leere Seite",
+      describe: "Nur Navigation – Platz für eigene Belegung",
+      deviceRole: null,
+      build: () => ({ title: "Frei", keys: [], encoders: [] })
+    }
+  };
+
+  // js/layout.js
+  function keyRows(deck) {
+    const rows = /* @__PURE__ */ new Map();
+    for (const [r, c] of deck.keys) {
+      if (!rows.has(r)) rows.set(r, []);
+      rows.get(r).push(c);
+    }
+    return [...rows.entries()].sort((a, b) => a[0] - b[0]).map(([r, cols]) => cols.sort((a, b) => a - b).map((c) => [r, c]));
+  }
+  function rowWidth(deck) {
+    return Math.max(...keyRows(deck).map((r) => r.length));
+  }
+  function navSlots(deckId, pageCount, swipe = false) {
+    const deck = DECKS[deckId];
+    if (pageCount <= 1 || deckId === "pedal" || swipe) return [];
+    if (deckId === "neo") return [[2, 0], [2, 3]];
+    const rows = keyRows(deck);
+    const last = rows[rows.length - 1];
+    const keyCount = deck.keys.length;
+    const n = keyCount >= 24 ? pageCount <= 4 ? pageCount : 3 : 1;
+    return last.slice(-n);
+  }
+  function placeKeys(deck, items, reserved) {
+    const rows = keyRows(deck).map((r) => r.filter(([rr, cc]) => !reserved.some(([a, b]) => a === rr && b === cc)));
+    const tryPlace = (list2) => {
+      const used = /* @__PURE__ */ new Set();
+      const placed = /* @__PURE__ */ new Map();
+      let rowIdx = 0;
+      let colIdx = 0;
+      let lastGroup = null;
+      for (const it of list2.filter((i) => i.row)) {
+        if (it.group !== lastGroup) {
+          if (colIdx > 0) {
+            rowIdx++;
+            colIdx = 0;
+          }
+          lastGroup = it.group;
+        }
+        while (rowIdx < rows.length && colIdx >= rows[rowIdx].length) {
+          rowIdx++;
+          colIdx = 0;
+        }
+        if (rowIdx >= rows.length) return null;
+        const [r, c] = rows[rowIdx][colIdx++];
+        used.add(`${r}/${c}`);
+        placed.set(`${r}/${c}`, it);
+      }
+      const free = rows.flat().filter(([r, c]) => !used.has(`${r}/${c}`));
+      const rest = list2.filter((i) => !i.row);
+      if (rest.length > free.length) return null;
+      rest.forEach((it, i) => placed.set(`${free[i][0]}/${free[i][1]}`, it));
+      return placed;
+    };
+    let list = items.slice();
+    const dropped = [];
+    for (; ; ) {
+      const placed = tryPlace(list);
+      if (placed) return { placed, dropped };
+      let worst = -1;
+      for (let i = 0; i < list.length; i++) if (worst < 0 || list[i].prio >= list[worst].prio) worst = i;
+      if (worst < 0) return { placed: /* @__PURE__ */ new Map(), dropped };
+      dropped.unshift(list[worst]);
+      list.splice(worst, 1);
+    }
+  }
+  function encoderAsKeys(e, idx) {
+    const g = `enc${idx}`;
+    const title = String(e.name || e.text || "").replace(/^'/, "").split(/\\n|\n/)[0].trim() || `Regler ${idx + 1}`;
+    return [
+      { group: g, prio: 8, btn: { text: `${title}
+−`, bgcolor: 2107962, down: e.left, info: `${title} runter` } },
+      { group: g, prio: 8, btn: { text: `${title}
++`, bgcolor: 2107962, down: e.right, info: `${title} hoch` } }
+    ];
+  }
+  function buildPage(deckId, built, nav, options = {}) {
+    const deck = DECKS[deckId];
+    const report = { dropped: [], droppedEncoders: [] };
+    const controls = {};
+    const set = (r, c, ctrl, meta) => {
+      controls[r] = controls[r] || {};
+      controls[r][c] = ctrl;
+      meta && (report.cells = report.cells || {}, report.cells[`${r}/${c}`] = meta);
+    };
+    const encSlots = deck.encoders;
+    let encs = built.encoders || [];
+    let keyItems = built.keys.slice();
+    if (encSlots.length === 0) {
+      encs.forEach((e, i) => {
+        if (options.encodersAsKeys && !e.noKeys) keyItems.push(...encoderAsKeys(e, i));
+        else report.droppedEncoders.push(e);
+      });
+      encs = [];
+    } else if (encs.length > encSlots.length) {
+      report.droppedEncoders.push(...encs.slice(encSlots.length));
+      encs = encs.slice(0, encSlots.length);
+    }
+    encs.forEach((e, i) => {
+      const [r, c, lcd] = encSlots[i];
+      const btn = {
+        text: e.text,
+        textExpression: e.textExpression,
+        size: e.size ?? 14,
+        bgcolor: COLORS.black,
+        down: e.push || [],
+        left: e.left,
+        right: e.right,
+        rotary: true,
+        feedbacks: e.feedbacks || []
+      };
+      set(r, c, makeButton(btn), { kind: "encoder", ...btn, info: e.info });
+      if (lcd) {
+        const lcdBtn = { ...btn, rotary: false, left: void 0, right: void 0, bgcolor: 1053720 };
+        set(lcd[0], lcd[1], makeButton(lcdBtn), { kind: "lcd", ...lcdBtn, info: e.info });
+      }
+    });
+    if (deckId === "neo") {
+      set(2, 1, makeButton({ text: built.title, size: 14 }), { kind: "lcd", text: built.title });
+    }
+    const navBtns = [];
+    if (nav && nav.slots.length) {
+      const pages = nav.pages;
+      if (deckId === "neo") {
+        const prev = pages[(nav.current - 1 + pages.length) % pages.length];
+        const next = pages[(nav.current + 1) % pages.length];
+        navBtns.push({ text: `◀
+${prev.title}`, size: 14, bgcolor: 3158064, down: [internal.setPage(prev.number)] });
+        navBtns.push({ text: `${next.title}
+▶`, size: 14, bgcolor: 3158064, down: [internal.setPage(next.number)] });
+      } else if (pages.length > nav.slots.length && nav.slots.length >= 3) {
+        const prev = pages[(nav.current - 1 + pages.length) % pages.length];
+        const next = pages[(nav.current + 1) % pages.length];
+        navBtns.push({ text: `◀
+${prev.title}`, size: 14, bgcolor: 3158064, down: [internal.setPage(prev.number)] });
+        navBtns.push({ text: `${pages[nav.current].title}
+${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COLORS.white, down: [internal.setPage(pages[0].number)], info: "Aktuelle Seite – Drücken = erste Seite" });
+        navBtns.push({ text: `${next.title}
+▶`, size: 14, bgcolor: 3158064, down: [internal.setPage(next.number)] });
+      } else if (nav.slots.length === 1) {
+        const next = pages[(nav.current + 1) % pages.length];
+        navBtns.push({ text: `${pages[nav.current].title}
+▶ ${next.title}`, size: 14, bgcolor: 3158064, down: [internal.setPage(next.number)] });
+      } else {
+        pages.slice(0, nav.slots.length).forEach(
+          (p, i) => navBtns.push({
+            text: p.title,
+            size: 14,
+            color: i === nav.current ? COLORS.black : COLORS.white,
+            bgcolor: i === nav.current ? COLORS.white : 3158064,
+            down: [internal.setPage(p.number)]
+          })
+        );
+      }
+      nav.slots.forEach(([r, c], i) => set(r, c, makeButton(navBtns[i]), { kind: "nav", ...navBtns[i], info: "Seitenwechsel" }));
+    }
+    const reserved = nav ? nav.slots : [];
+    const { placed, dropped } = placeKeys(deck, keyItems, reserved);
+    report.dropped = dropped;
+    for (const [rc, it] of placed) {
+      const [r, c] = rc.split("/").map(Number);
+      set(r, c, makeButton(it.btn), { kind: "key", ...it.btn });
+    }
+    const allRows = Object.keys(controls).map(Number);
+    const allCols = Object.values(controls).flatMap((o) => Object.keys(o).map(Number));
+    const gridSize = {
+      minColumn: 0,
+      maxColumn: Math.max(7, deck.cols - 1, ...allCols),
+      minRow: 0,
+      maxRow: Math.max(3, deck.rows - 1, ...allRows)
+    };
+    return { page: { name: built.title, controls, gridSize }, report };
+  }
+
+  // js/export.js
+  var BUILD = "kleem-companion-builder";
+  function buildProject(project) {
+    const devById = Object.fromEntries(project.devices.map((d) => [d.id, { ...d, label: cleanLabel(d.label) }]));
+    const startPage = Math.max(1, Number(project.startPage) || 1);
+    const out = [];
+    const used = /* @__PURE__ */ new Set();
+    let pageNo = startPage;
+    project.decks.forEach((deckCfg, deckIdx) => {
+      const deck = DECKS[deckCfg.deckType];
+      const autoTitle = (p) => {
+        const t = TEMPLATES[p.template];
+        const d = devById[p.deviceId];
+        if (p.template === "ptz") return "PTZ";
+        if (p.template === "audio") return d ? `Audio ${DEVICE_TYPES[d.type].short}` : "Audio";
+        if (d && t?.deviceRole) return DEVICE_TYPES[d.type].short;
+        return t?.name || "Seite";
+      };
+      const pagesForDeck = deckCfg.pages.map((p, i) => ({ number: pageNo + i, title: p.title || autoTitle(p) }));
+      const swipe = deckCfg.swipe ?? deckCfg.deckType === "plus";
+      const slots = navSlots(deckCfg.deckType, pagesForDeck.length, swipe && DECKS[deckCfg.deckType].lcd.length > 0 && deckCfg.deckType !== "neo");
+      deckCfg.pages.forEach((p, i) => {
+        const tpl = TEMPLATES[p.template];
+        const ctx = {
+          rowWidth: rowWidth(deck),
+          hasEncoders: deck.encoders.length > 0,
+          keyCount: deck.keys.length - slots.length
+        };
+        if (tpl.multiDevice) {
+          ctx.cams = (p.deviceIds || []).map((id) => devById[id]).filter(Boolean);
+          ctx.mixer = devById[p.mixerId] || null;
+          ctx.rp = devById[p.rpId] || null;
+          if (ctx.rp) used.add(ctx.rp.id);
+          ctx.cams.forEach((c) => used.add(c.id));
+          if (ctx.mixer && ctx.cams.some((c) => c.params.tallyInput)) used.add(ctx.mixer.id);
+        } else if (tpl.deviceRole) {
+          ctx.dev = devById[p.deviceId];
+          if (ctx.dev) used.add(ctx.dev.id);
+        }
+        let built;
+        const missing = tpl.multiDevice ? ctx.cams.length === 0 : tpl.deviceRole && !ctx.dev;
+        if (missing) built = { title: pagesForDeck[i].title, keys: [], encoders: [], warning: "Kein Gerät zugewiesen" };
+        else built = tpl.build(ctx);
+        built.title = pagesForDeck[i].title;
+        const { page, report } = buildPage(deckCfg.deckType, built, { slots, pages: pagesForDeck, current: i }, { encodersAsKeys: project.encodersAsKeys !== false });
+        if (built.warning) report.warning = built.warning;
+        out.push({ number: pagesForDeck[i].number, deckIdx, title: built.title, page, report });
+      });
+      pageNo += deckCfg.pages.length;
+    });
+    return { pages: out, used, devById };
+  }
+  function exportInstances(project, used, devById) {
+    const instances = {};
+    let sort = 0;
+    for (const id of used) {
+      const d = devById[id];
+      const t = DEVICE_TYPES[d.type];
+      instances[d.id] = {
+        moduleInstanceType: "connection",
+        moduleId: t.moduleId,
+        moduleVersionId: project.pinModuleVersions ? t.moduleVersion : void 0,
+        updatePolicy: "stable",
+        label: d.label,
+        config: t.config(d),
+        secrets: t.secrets ? t.secrets(d) : void 0,
+        isFirstInit: false,
+        lastUpgradeIndex: t.upgradeIndex,
+        enabled: true,
+        sortOrder: sort++
+      };
+    }
+    return instances;
+  }
+  function customVariables(project) {
+    const vars = {};
+    let s = 0;
+    for (const p of project.decks.flatMap((d) => d.pages).filter((p2) => p2.template === "rp")) {
+      const d = project.devices.find((x) => x.id === p.deviceId);
+      if (!d) continue;
+      const base = `rp_${cleanLabel(d.label).replace(/-/g, "_")}`;
+      vars[`${base}_cam`] = { description: `${d.label}: Ziel-Kamera (Drehregler)`, defaultValue: 1, persistCurrentValue: false, sortOrder: s++ };
+      vars[`${base}_pmem`] = { description: `${d.label}: Ziel-Preset-Memory (Drehregler)`, defaultValue: 1, persistCurrentValue: false, sortOrder: s++ };
+    }
+    const ptzPages = project.decks.flatMap((d) => d.pages).filter((p) => p.template === "ptz");
+    if (!ptzPages.length) return vars;
+    const maxCams = Math.max(...ptzPages.map((p) => (p.deviceIds || []).length), 1);
+    vars.ptz_sel = { description: "PTZ: gewählte Kamera (1…n)", defaultValue: 1, persistCurrentValue: false, sortOrder: s++ };
+    vars.ptz_store = { description: "PTZ: STORE-Modus aktiv (1) / aus (0)", defaultValue: 0, persistCurrentValue: false, sortOrder: s++ };
+    for (let i = 1; i <= maxCams; i++)
+      vars[`ptz_c${i}_pst`] = { description: `PTZ: zuletzt abgerufenes Preset Kamera ${i}`, defaultValue: 0, persistCurrentValue: true, sortOrder: s++ };
+    return vars;
+  }
+  function exportFull(project) {
+    const { pages, used, devById } = buildProject(project);
+    const pageObj = {};
+    for (const p of pages) pageObj[p.number] = { id: uid(), ...p.page };
+    return {
+      version: FILE_VERSION,
+      type: "full",
+      companionBuild: BUILD,
+      pages: pageObj,
+      instances: exportInstances(project, used, devById),
+      connectionCollections: [],
+      custom_variables: customVariables(project),
+      customVariablesCollections: []
+    };
+  }
+  function exportSinglePage(project, pageNumber) {
+    const { pages, devById } = buildProject(project);
+    const p = pages.find((x) => x.number === pageNumber);
+    const used = /* @__PURE__ */ new Set();
+    const walk = (ents) => (ents || []).forEach((e) => {
+      if (e.connectionId !== "internal") used.add(e.connectionId);
+      Object.values(e.children || {}).forEach(walk);
+    });
+    for (const row of Object.values(p.page.controls))
+      for (const ctrl of Object.values(row)) {
+        walk(ctrl.feedbacks);
+        Object.values(ctrl.steps || {}).forEach((st) => Object.values(st.action_sets).forEach(walk));
+      }
+    return {
+      version: FILE_VERSION,
+      type: "page",
+      companionBuild: BUILD,
+      page: { id: uid(), ...p.page },
+      instances: exportInstances(project, used, devById),
+      connectionCollections: [],
+      oldPageNumber: pageNumber
+    };
+  }
+  function download(filename, obj) {
+    const blob = new Blob([JSON.stringify(obj, null, "	")], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      URL.revokeObjectURL(a.href);
+      a.remove();
+    }, 1e3);
+  }
+
+  // js/kabelplan.js
+  var BRIDGE_KEY = "kleem.kabelplan.export.v1";
+  var SHARED_KEY = "kleem.shared.devices";
+  var RULES = [
+    { type: "rp200", re: /\baw-?rp ?200\b/i },
+    { type: "rp150", re: /\baw-?rp ?150\b/i },
+    { type: "mitti", re: /\bmitti\b/i },
+    { type: "qlab", re: /\bq-?lab\b/i },
+    { type: "timer", re: /irisdown|countdown ?timer/i },
+    { type: "ppt", re: /oscpoint|powerpoint|\bppt\b/i },
+    { type: "vmix", re: /\bvmix\b/i },
+    { type: "atem", re: /\batem\b/i },
+    { type: "kairos", re: /kairos|\bkc-?\d|\bat-kc/i },
+    { type: "videohub", re: /videohub|smart ?videohub|clean ?switch/i },
+    { type: "ptz", re: /\baw-?(ue|he|ub|hr)\d|\bptz\b|panasonic.*(ue|he)\d{2,3}|\bak-?ub/i }
+  ];
+  var isVideoIn = (pt) => (pt.dir === "in" || pt.dir === "io") && /SDI|HDMI|DVI|DP|ST ?2110|NDI|IP/i.test(pt.type || "") && pt.level !== "Ref" && !/ETH/i.test(pt.type || "");
+  var isVideoOut = (pt) => (pt.dir === "out" || pt.dir === "io") && /SDI|HDMI|DVI|DP/i.test(pt.type || "") && pt.level !== "Ref";
+  function readBridge(json) {
+    let data = json;
+    if (!data) {
+      try {
+        data = JSON.parse(localStorage.getItem(BRIDGE_KEY) || "null");
+      } catch {
+        data = null;
+      }
+    }
+    if (!data || data.kind !== "kleem.kabelplan.export" || !Array.isArray(data.plans)) return null;
+    return data;
+  }
+  function bridgeCandidates(plan) {
+    const devs = plan.devices || [];
+    const byId = Object.fromEntries(devs.map((d) => [d.id, d]));
+    const typeOf = (d) => classify(`${d.mfr || ""} ${d.name || ""} ${d.libId || ""}`);
+    const ipOf = (d) => {
+      const ports = (d.ports || []).filter((p) => p.ip);
+      return (ports.find((p) => /ETH/i.test(p.type)) || ports[0])?.ip || "";
+    };
+    const out = [];
+    let camNo = 0;
+    for (const d of devs) {
+      const t = typeOf(d);
+      if (t && t !== "vmix" && t !== "qlab" && t !== "mitti" && t !== "ppt" && t !== "timer") {
+        const c = { type: t, name: d.label || d.name, model: [d.mfr, d.name].filter(Boolean).join(" "), ip: ipOf(d), sourceId: `kp:${d.id}`, params: {}, notes: [] };
+        if (t === "ptz") {
+          camNo++;
+          c.params.title = `CAM ${camNo}`;
+          c.label = `cam${camNo}`;
+          for (const p of d.ports || []) {
+            if (!p.peer || !isVideoOut(p)) continue;
+            const peer = byId[p.peer.deviceId];
+            if (peer && typeOf(peer) === "atem" && p.peer.index) {
+              c.params.tallyInput = String(p.peer.index);
+              c.notes.push(`Tally: ${peer.label} In ${p.peer.index}`);
+              break;
+            }
+          }
+        }
+        if (t === "videohub") {
+          const ins = (d.ports || []).filter((p) => p.dir === "in" && /SDI/i.test(p.type) && p.level !== "Ref");
+          const outs = (d.ports || []).filter((p) => p.dir === "out" && /SDI/i.test(p.type) && p.level !== "Ref");
+          if (ins.length) c.params.inputCount = ins.length;
+          if (outs.length) c.params.outputCount = outs.length;
+          const usedIn = ins.filter((p) => p.peer).map((p) => p.index).slice(0, 16);
+          const usedOut = outs.filter((p) => p.peer).map((p) => p.index).slice(0, 8);
+          if (usedIn.length) c.params.sources = usedIn.join(",");
+          if (usedOut.length) c.params.destinations = usedOut.join(",");
+          c.notes.push(`${ins.length}×${outs.length}, belegt: ${usedIn.length} In / ${usedOut.length} Out`);
+        }
+        if (t === "atem") {
+          const used = (d.ports || []).filter((p) => isVideoIn(p) && p.peer).map((p) => p.index);
+          if (used.length) {
+            c.params.inputs = Math.min(20, Math.max(4, ...used));
+            c.notes.push(`${used.length} Eingänge belegt`);
+          }
+        }
+        out.push(c);
+      }
+      for (const sw of d.software || []) {
+        const st = classify(sw);
+        if (!["vmix", "qlab", "mitti", "ppt", "timer"].includes(st)) continue;
+        out.push({ type: st, name: `${sw} – ${d.label}`, model: sw, ip: ipOf(d), sourceId: `kp:${d.id}:${sw}`, params: {}, notes: [`auf ${d.label}`] });
+      }
+    }
+    for (const c of out) if (!c.ip) c.notes.push("keine IP im Kabelplan");
+    return out;
+  }
+  function classify(text) {
+    for (const r of RULES) if (r.re.test(text)) return r.type;
+    return null;
+  }
+  var IP_RE = /\b(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}\b/;
+  function findDevices(json) {
+    const found = [];
+    const seen = /* @__PURE__ */ new WeakSet();
+    const walk = (node, depth) => {
+      if (!node || typeof node !== "object" || depth > 12 || seen.has(node)) return;
+      seen.add(node);
+      if (Array.isArray(node)) return node.forEach((n) => walk(n, depth + 1));
+      const strings = [];
+      for (const [k, v2] of Object.entries(node)) if (typeof v2 === "string" || typeof v2 === "number") strings.push(`${k}=${v2}`);
+      const flat = strings.join(" ");
+      const name = node.name ?? node.label ?? node.title ?? node.bezeichnung ?? node.deviceName;
+      const model = [node.manufacturer, node.hersteller, node.brand, node.vendor, node.model, node.modell, node.type, node.typ, node.product, node.category, node.kategorie].filter((x) => typeof x === "string").join(" ");
+      const type = classify(`${model} ${name ?? ""}`);
+      if (type && (name || model)) {
+        const ip = findIp(node);
+        found.push({ type, name: String(name || model).trim(), model: model.trim(), ip, sourceId: node.id ?? node.uuid ?? null });
+      }
+      for (const v2 of Object.values(node)) if (v2 && typeof v2 === "object") walk(v2, depth + 1);
+    };
+    walk(json, 0);
+    const uniq = /* @__PURE__ */ new Map();
+    for (const f of found) {
+      const k = `${f.type}|${f.name}|${f.ip || ""}`;
+      if (!uniq.has(k)) uniq.set(k, f);
+    }
+    return [...uniq.values()];
+  }
+  function findIp(node) {
+    const direct = node.ip ?? node.ipAddress ?? node.host ?? node.address ?? node.jobIp ?? node.defaultIp;
+    if (typeof direct === "string" && IP_RE.test(direct)) return direct.match(IP_RE)[0];
+    for (const k of ["interfaces", "ips", "ipList", "network", "netzwerk", "ports", "connectors"]) {
+      const v2 = node[k];
+      if (!v2) continue;
+      const m = JSON.stringify(v2).match(IP_RE);
+      if (m) return m[0];
+    }
+    return "";
+  }
+  function scanLocalStorage() {
+    const results = [];
+    let keys = [];
+    try {
+      keys = Object.keys(localStorage);
+    } catch {
+      return results;
+    }
+    for (const k of keys) {
+      if (k.startsWith("kleem.companion.") || k === BRIDGE_KEY) continue;
+      let raw;
+      try {
+        raw = localStorage.getItem(k);
+      } catch {
+        continue;
+      }
+      if (!raw || raw.length < 10 || raw[0] !== "{" && raw[0] !== "[") continue;
+      try {
+        const devs = findDevices(JSON.parse(raw));
+        if (devs.length) results.push({ key: k, shared: k === SHARED_KEY, devices: devs });
+      } catch {
+      }
+    }
+    return results.sort((a, b) => Number(b.shared) - Number(a.shared));
+  }
+  function mergeDevices(found, existing) {
+    const added = [];
+    let updated = 0;
+    for (const f of found) {
+      const prev = f.sourceId && existing.find((d2) => d2.sourceId === f.sourceId);
+      if (prev) {
+        if (f.ip) prev.host = f.ip;
+        for (const [k, v2] of Object.entries(f.params || {})) if (k !== "title") prev.params[k] = v2;
+        updated++;
+        continue;
+      }
+      const d = newDevice(f.type, [...existing, ...added]);
+      if (f.ip) d.host = f.ip;
+      if (f.label) d.label = f.label;
+      else if (!["vmix", "qlab", "mitti", "ppt", "timer", "atem", "kairos", "videohub", "rp150", "rp200"].includes(f.type)) d.label = cleanLabel(f.name).toLowerCase().slice(0, 24) || d.label;
+      let n = 2;
+      const base = d.label;
+      while ([...existing, ...added].some((x) => x.label === d.label)) d.label = `${base}_${n++}`;
+      Object.assign(d.params, f.params || {});
+      if (f.type === "ptz" && !f.params?.title) d.params.title = String(f.name).slice(0, 12);
+      d.source = "kabelplan";
+      d.sourceId = f.sourceId;
+      d.model = f.model;
+      added.push(d);
+    }
+    return { added, updated };
+  }
+  function publishDevices(project) {
+    try {
+      localStorage.setItem(
+        "kleem.companion.devices",
+        JSON.stringify({
+          format: "kleem.devices.v1",
+          project: project.name,
+          updated: (/* @__PURE__ */ new Date()).toISOString(),
+          devices: project.devices.map((d) => ({ id: d.id, name: d.label, category: d.type, ip: d.host }))
+        })
+      );
+    } catch {
+    }
+  }
+
+  // js/app.js
+  var VERSION = "1.2.0";
+  var LS_PROJECTS = "kleem.companion.projects";
+  var LS_CURRENT = "kleem.companion.current";
+  var LS_SETTINGS = "kleem.companion.settings";
+  var store = {
+    get(k, def) {
+      try {
+        const v2 = localStorage.getItem(k);
+        return v2 ? JSON.parse(v2) : def;
+      } catch {
+        return def;
+      }
+    },
+    set(k, v2) {
+      try {
+        localStorage.setItem(k, JSON.stringify(v2));
+      } catch {
+        toast("Speichern im Browser nicht möglich – bitte Projekt exportieren");
+      }
+    }
+  };
+  var projects = store.get(LS_PROJECTS, {});
+  var settings = store.get(LS_SETTINGS, { kabelplan: true, theme: "auto" });
+  var current = store.get(LS_CURRENT, null);
+  var ui = { tab: "devices", previewDeck: 0, previewPage: 0, selCell: null };
+  var rid = () => Math.random().toString(36).slice(2, 10);
+  function blankProject(name = "Neues Projekt") {
+    return { id: rid(), name, created: (/* @__PURE__ */ new Date()).toISOString(), devices: [], decks: [], encodersAsKeys: true, pinModuleVersions: false, startPage: 1 };
+  }
+  if (!projects[current]) {
+    const ids = Object.keys(projects);
+    if (ids.length) current = ids[0];
+    else {
+      const p = blankProject("Erstes Projekt");
+      projects[p.id] = p;
+      current = p.id;
+    }
+  }
+  var P = () => projects[current];
+  function save() {
+    P().updated = (/* @__PURE__ */ new Date()).toISOString();
+    store.set(LS_PROJECTS, projects);
+    store.set(LS_CURRENT, current);
+    if (settings.kabelplan) publishDevices(P());
+  }
+  var $ = (s, el = document) => el.querySelector(s);
+  var esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  function toast(msg) {
+    const t = $("#toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toast.t);
+    toast.t = setTimeout(() => t.classList.remove("show"), 2600);
+  }
+  var devName = (d) => `${DEVICE_TYPES[d.type].name} · ${d.type === "ptz" ? d.params.title || d.label : d.label}`;
+  var devicesByRole = (role) => P().devices.filter((d) => (Array.isArray(role) ? role : [role]).includes(DEVICE_TYPES[d.type].role));
+  function dialog(html, onSubmit) {
+    const dlg = $("#dlg");
+    $("#dlgBody").innerHTML = html;
+    dlg.showModal();
+    $("#dlgBody").onsubmit = (e) => {
+      const btn = e.submitter;
+      if (btn && btn.value === "ok" && onSubmit) {
+        if (onSubmit(new FormData($("#dlgBody"))) === false) e.preventDefault();
+      }
+    };
+  }
+  document.querySelectorAll(".tabs button").forEach(
+    (b) => b.addEventListener("click", () => {
+      ui.tab = b.dataset.tab;
+      render();
+    })
+  );
+  function render() {
+    document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === ui.tab));
+    document.querySelectorAll(".tab").forEach((s) => s.classList.toggle("active", s.id === `tab-${ui.tab}`));
+    document.documentElement.dataset.theme = settings.theme === "auto" ? "" : settings.theme;
+    renderProjectBar();
+    ({ devices: renderDevices, decks: renderDecks, preview: renderPreview, export: renderExport, settings: renderSettings })[ui.tab]();
+  }
+  function renderProjectBar() {
+    const sel = $("#projectSelect");
+    sel.innerHTML = Object.values(projects).sort((a, b) => a.name.localeCompare(b.name)).map((p) => `<option value="${p.id}" ${p.id === current ? "selected" : ""}>${esc(p.name)}</option>`).join("");
+  }
+  $("#projectSelect").addEventListener("change", (e) => {
+    current = e.target.value;
+    ui.previewDeck = 0;
+    ui.previewPage = 0;
+    save();
+    render();
+  });
+  $("#projectNew").addEventListener(
+    "click",
+    () => dialog(
+      `<h2>Neues Projekt</h2><label class="f">Name<input name="name" required autofocus placeholder="z. B. Gala Hofburg 2026"></label>
+     <div class="dlg-actions"><button class="btn" value="cancel">Abbrechen</button><button class="btn primary" value="ok">Anlegen</button></div>`,
+      (fd) => {
+        const p = blankProject(fd.get("name").trim() || "Projekt");
+        projects[p.id] = p;
+        current = p.id;
+        save();
+        ui.tab = "devices";
+        render();
+      }
+    )
+  );
+  $("#projectMenu").addEventListener("click", () => {
+    dialog(
+      `<h2>Projekt „${esc(P().name)}“</h2>
+     <label class="f">Name<input name="name" value="${esc(P().name)}"></label>
+     <div class="row">
+       <button class="btn" value="dup" type="button" id="pDup">Duplizieren</button>
+       <button class="btn" type="button" id="pExp">Projektdatei sichern (.json)</button>
+       <label class="btn">Projektdatei laden<input type="file" id="pImp" accept=".json,application/json" hidden></label>
+       <button class="btn danger" type="button" id="pDel">Löschen</button>
+     </div>
+     <p class="hint">Projekte liegen nur in diesem Browser. Für Backup oder Weitergabe die Projektdatei sichern (z. B. in iCloud Drive).</p>
+     <div class="dlg-actions"><button class="btn" value="cancel">Schließen</button><button class="btn primary" value="ok">Übernehmen</button></div>`,
+      (fd) => {
+        P().name = fd.get("name").trim() || P().name;
+        save();
+        render();
+      }
+    );
+    $("#pDup").onclick = () => {
+      const c = structuredClone(P());
+      c.id = rid();
+      c.name += " (Kopie)";
+      projects[c.id] = c;
+      current = c.id;
+      save();
+      $("#dlg").close();
+      render();
+    };
+    $("#pExp").onclick = () => download(`${cleanLabel(P().name)}.kleem-companion.json`, { format: "kleem.companion-builder.project.v1", app: VERSION, project: P() });
+    $("#pImp").onchange = async (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      try {
+        const j = JSON.parse(await f.text());
+        const p = j.project || j;
+        if (!Array.isArray(p.devices) || !Array.isArray(p.decks)) throw new Error();
+        p.id = rid();
+        projects[p.id] = p;
+        current = p.id;
+        save();
+        $("#dlg").close();
+        render();
+        toast("Projekt geladen");
+      } catch {
+        toast("Keine gültige Projektdatei");
+      }
+    };
+    $("#pDel").onclick = () => {
+      if (!confirm(`Projekt „${P().name}“ wirklich löschen?`)) return;
+      delete projects[current];
+      current = Object.keys(projects)[0];
+      if (!current) {
+        const p = blankProject();
+        projects[p.id] = p;
+        current = p.id;
+      }
+      save();
+      $("#dlg").close();
+      render();
+    };
+  });
+  function renderDevices() {
+    const el = $("#tab-devices");
+    const p = P();
+    el.innerHTML = `
+    <div class="add-bar">
+      ${Object.entries(DEVICE_TYPES).map(([k, t]) => `<button class="btn" data-add="${k}">＋ ${esc(t.name)} <small>${esc(t.vendor)}</small></button>`).join("")}
+      ${settings.kabelplan ? `<button class="btn primary" id="kpImport">Aus Kabelplan übernehmen</button>` : ""}
+    </div>
+    ${p.devices.length === 0 ? `<div class="card empty">Noch keine Geräte. Oben einen Gerätetyp hinzufügen${settings.kabelplan ? " oder aus dem Kabelplan übernehmen" : ""}.</div>` : ""}
+    ${p.devices.map(deviceCard).join("")}`;
+    el.querySelectorAll("[data-add]").forEach(
+      (b) => b.addEventListener("click", () => {
+        p.devices.push(newDevice(b.dataset.add, p.devices));
+        save();
+        renderDevices();
+      })
+    );
+    $("#kpImport")?.addEventListener("click", kabelplanDialog);
+    el.querySelectorAll("[data-dev]").forEach((card) => {
+      const d = p.devices.find((x) => x.id === card.dataset.dev);
+      card.addEventListener("change", (e) => {
+        const f = e.target;
+        if (!f.name) return;
+        const v2 = f.type === "checkbox" ? f.checked : f.type === "number" ? Number(f.value) : f.value;
+        if (f.name === "label") d.label = cleanLabel(v2);
+        else if (f.name === "host") d.host = v2.trim();
+        else d.params[f.name] = v2;
+        save();
+        if (f.name === "label") renderDevices();
+      });
+      card.querySelector("[data-del]")?.addEventListener("click", () => {
+        if (!confirm(`${devName(d)} entfernen?`)) return;
+        p.devices = p.devices.filter((x) => x !== d);
+        save();
+        renderDevices();
+      });
+    });
+  }
+  function deviceCard(d) {
+    const t = DEVICE_TYPES[d.type];
+    const field = (prm) => {
+      const v2 = d.params[prm.id] ?? prm.default;
+      if (prm.type === "bool") return `<label class="f check"><input type="checkbox" name="${prm.id}" ${v2 ? "checked" : ""}>${esc(prm.label)}</label>`;
+      if (prm.type === "number") return `<label class="f">${esc(prm.label)}<input type="number" inputmode="decimal" name="${prm.id}" value="${esc(v2)}" ${prm.min !== void 0 ? `min="${prm.min}"` : ""} ${prm.max !== void 0 ? `max="${prm.max}"` : ""} step="any"></label>`;
+      return `<label class="f">${esc(prm.label)}<input name="${prm.id}" value="${esc(v2)}"></label>`;
+    };
+    return `<div class="card" data-dev="${d.id}">
+    <div class="card-head">
+      <div><h3>${esc(t.vendor)} ${esc(t.name)} ${d.source === "kabelplan" ? '<span class="pill kp">Kabelplan</span>' : ""}</h3>
+      <small>Modul <code>${t.moduleId}</code> (geprüft mit v${t.moduleVersion})${d.model ? " · " + esc(d.model) : ""}</small>${t.hint ? `<p class="hint">${esc(t.hint)}</p>` : ""}</div>
+      <div class="list-actions"><button class="btn danger" data-del>Entfernen</button></div>
+    </div>
+    <div class="grid-form">
+      <label class="f">Verbindungsname in Companion<input name="label" value="${esc(d.label)}" autocapitalize="off" spellcheck="false"></label>
+      <label class="f">IP-Adresse<input name="host" value="${esc(d.host)}" inputmode="decimal" autocapitalize="off" spellcheck="false"></label>
+      ${t.params.map(field).join("")}
+    </div>
+  </div>`;
+  }
+  function kabelplanDialog() {
+    let bridge = readBridge();
+    let planId = bridge?.current;
+    let list = [];
+    const fallback = () => scanLocalStorage().flatMap((f) => f.devices.map((d) => ({ ...d, params: {}, notes: [`aus ${f.key}`] })));
+    let compute = () => {
+      if (bridge) {
+        const plan = bridge.plans.find((x) => x.id === planId) || bridge.plans[0];
+        planId = plan?.id;
+        list = plan ? bridgeCandidates(plan) : [];
+      } else list = fallback();
+    };
+    const known = (c) => P().devices.some((d) => d.sourceId && d.sourceId === c.sourceId);
+    const renderBody = () => {
+      compute();
+      const head = bridge ? `<label class="f">Plan aus dem Kabelplan<select id="kpPlan">${bridge.plans.map((x) => `<option value="${esc(x.id)}" ${x.id === planId ? "selected" : ""}>${esc(x.name)} (${x.devices.length} Geräte)</option>`).join("")}</select></label>
+         <small class="muted">Stand Kabelplan: ${esc(new Date(bridge.updated).toLocaleString("de-AT"))}</small>` : `<p class="muted">Keine Kabelplan-Schnittstelle gefunden (Kabelplan ab Version 2.2 unter derselben Adresse öffnen) – zeige allgemeine Suche im Browser-Speicher.</p>`;
+      const body = list.length ? `<div class="kp-list">${list.map(
+        (d, i) => `<label><input type="checkbox" name="d${i}" checked> <span><strong>${esc(d.label ? d.params.title || d.label : d.name)}</strong> ${known(d) ? '<span class="pill kp">aktualisieren</span>' : '<span class="pill">neu</span>'}<br><small>${esc(DEVICE_TYPES[d.type].name)}${d.ip ? " · " + esc(d.ip) : ""}${d.model && d.model !== DEVICE_TYPES[d.type].name ? " · " + esc(d.model) : ""}${d.notes?.length ? " · " + esc(d.notes.join(" · ")) : ""}</small></span></label>`
+      ).join("")}</div>` : `<p class="muted">Keine passenden Geräte gefunden. Erkannt werden ATEM, Kairos, Videohub, Panasonic-PTZ, AW-RP150/RP200 sowie vMix, QLab, Mitti, PowerPoint und Countdown Timer als Software auf Rechnern.</p>`;
+      $("#kpBody").innerHTML = head + body;
+      $("#kpPlan")?.addEventListener("change", (e) => {
+        planId = e.target.value;
+        renderBody();
+      });
+    };
+    dialog(
+      `<h2>Aus Kabelplan übernehmen</h2>
+     <div id="kpBody"></div>
+     <div class="row"><button type="button" class="btn" id="kpPaste">Aus Zwischenablage einfügen</button><label class="btn">Kabelplan-Datei (.json) laden<input type="file" id="kpFile" accept=".json,application/json" hidden></label></div>
+     <p class="hint">Neue Geräte werden angelegt, bereits übernommene aktualisiert (IP, Tally-Eingang, Anschlusszahlen). Tally wird gesetzt, wenn eine Kamera im Kabelplan direkt an einem ATEM-Eingang hängt.</p>
+     <div class="dlg-actions"><button class="btn" value="cancel">Abbrechen</button><button class="btn primary" value="ok">Übernehmen</button></div>`,
+      (fd) => {
+        const chosen = list.filter((_, i) => fd.get(`d${i}`));
+        const p = P();
+        const { added, updated } = mergeDevices(chosen, p.devices);
+        p.devices.push(...added);
+        save();
+        renderDevices();
+        toast(`${added.length} neu, ${updated} aktualisiert`);
+      }
+    );
+    renderBody();
+    const loadText = (text) => {
+      try {
+        const j = JSON.parse(text);
+        const b = readBridge(j);
+        if (b) {
+          bridge = b;
+          planId = b.current;
+          renderBody();
+        } else {
+          bridge = null;
+          list = findDevices(j).map((d) => ({ ...d, params: {}, notes: [] }));
+          const keep = list;
+          compute = () => list = keep;
+          renderBody();
+        }
+      } catch {
+        toast("Inhalt ist kein gültiges Kabelplan-JSON");
+      }
+    };
+    $("#kpFile").onchange = async (e) => e.target.files[0] && loadText(await e.target.files[0].text());
+    $("#kpPaste").onclick = async () => {
+      try {
+        loadText(await navigator.clipboard.readText());
+      } catch {
+        toast("Zwischenablage nicht lesbar – bitte Datei laden");
+      }
+    };
+  }
+  function suggestPages(deckType) {
+    const p = P();
+    const mixers = devicesByRole("mixer");
+    const cams = devicesByRole("ptz");
+    const routers = devicesByRole("router");
+    const pages = [];
+    const shows = devicesByRole(["presentation", "playback", "timer"]);
+    const rps = devicesByRole("rp");
+    if (deckType === "pedal") {
+      const d = devicesByRole("presentation")[0] || mixers[0] || shows[0];
+      if (d) pages.push({ id: rid(), template: "pedal", deviceId: d.id });
+      return pages;
+    }
+    for (const m of mixers) pages.push({ id: rid(), template: "mixer", deviceId: m.id, title: mixers.length > 1 ? m.label.toUpperCase() : "" });
+    if (cams.length) pages.push({ id: rid(), template: "ptz", deviceIds: cams.map((c) => c.id), mixerId: mixers[0]?.id || "", rpId: rps[0]?.id || "" });
+    for (const r of rps) pages.push({ id: rid(), template: "rp", deviceId: r.id, title: rps.length > 1 ? r.label.toUpperCase() : "" });
+    for (const m of mixers) if (TEMPLATES.audio.deviceTypes.includes(m.type)) pages.push({ id: rid(), template: "audio", deviceId: m.id, title: mixers.length > 1 ? `AUDIO ${m.label.toUpperCase()}` : "" });
+    for (const r of routers) pages.push({ id: rid(), template: "router", deviceId: r.id, title: routers.length > 1 ? r.label.toUpperCase() : "" });
+    const showTpl = { presentation: "presentation", playback: "playback", timer: "timer" };
+    for (const d of shows) pages.push({ id: rid(), template: showTpl[DEVICE_TYPES[d.type].role], deviceId: d.id, title: shows.filter((x) => x.type === d.type).length > 1 ? d.label.toUpperCase() : "" });
+    if (!pages.length) pages.push({ id: rid(), template: "empty" });
+    void p;
+    return pages;
+  }
+  function renderDecks() {
+    const el = $("#tab-decks");
+    const p = P();
+    const built = safeBuild();
+    el.innerHTML = `
+    <div class="add-bar">
+      <select id="deckType">${Object.entries(DECKS).map(([k, d]) => `<option value="${k}">${esc(d.name)} – ${d.keys.length} Tasten${d.encoders.length ? ` + ${d.encoders.length} Regler` : ""}</option>`).join("")}</select>
+      <button class="btn primary" id="deckAdd">＋ Stream Deck mit Grundset</button>
+    </div>
+    ${p.decks.length === 0 ? `<div class="card empty">Erst Geräte anlegen, dann hier das verwendete Stream Deck wählen – das Grundset wird aus den Geräten vorgeschlagen.</div>` : ""}
+    ${p.decks.map((d, i) => deckCard(d, i, built)).join("")}
+    ${p.decks.length ? `<p class="hint">Seitennummern in Companion ab Seite <input type="number" id="startPage" min="1" max="99" value="${p.startPage || 1}" style="width:80px;display:inline-block"> (Export einer kompletten Konfiguration ersetzt die Tasten dieser Seiten).</p>` : ""}`;
+    $("#deckAdd").onclick = () => {
+      const deckType = $("#deckType").value;
+      p.decks.push({ id: rid(), deckType, name: "", pages: suggestPages(deckType) });
+      save();
+      renderDecks();
+    };
+    $("#startPage")?.addEventListener("change", (e) => {
+      p.startPage = Math.max(1, Number(e.target.value) || 1);
+      save();
+      renderDecks();
+    });
+    el.querySelectorAll("[data-deck]").forEach((card) => {
+      const deck = p.decks.find((d) => d.id === card.dataset.deck);
+      card.addEventListener("change", (e) => {
+        const f = e.target;
+        const pg = deck.pages.find((x) => x.id === f.closest("[data-page]")?.dataset.page);
+        if (f.name === "deckName") deck.name = f.value;
+        else if (f.name === "swipe") deck.swipe = f.checked;
+        else if (f.name === "deckType") deck.deckType = f.value;
+        else if (pg && f.name === "template") {
+          pg.template = f.value;
+          pg.deviceId = pg.deviceIds = pg.mixerId = void 0;
+          const t = TEMPLATES[f.value];
+          if (t.multiDevice) {
+            pg.deviceIds = devicesByRole("ptz").map((c) => c.id);
+            pg.mixerId = devicesByRole("mixer")[0]?.id || "";
+            pg.rpId = devicesByRole("rp")[0]?.id || "";
+          } else if (t.deviceRole) pg.deviceId = templateDevices(t)[0]?.id;
+        } else if (pg && f.name === "device") pg.deviceId = f.value;
+        else if (pg && f.name === "mixer") pg.mixerId = f.value;
+        else if (pg && f.name === "rp") pg.rpId = f.value;
+        else if (pg && f.name === "title") pg.title = f.value.trim().slice(0, 16);
+        else if (pg && f.name === "cam") {
+          const ids = [...f.closest(".cams").querySelectorAll("input[name=cam]:checked")].map((x) => x.value);
+          pg.deviceIds = devicesByRole("ptz").map((c) => c.id).filter((id) => ids.includes(id));
+        }
+        save();
+        renderDecks();
+      });
+      card.addEventListener("click", (e) => {
+        const b = e.target.closest("button");
+        if (!b) return;
+        const pgId = b.closest("[data-page]")?.dataset.page;
+        const idx = deck.pages.findIndex((x) => x.id === pgId);
+        if (b.dataset.act === "delDeck") {
+          if (!confirm("Stream Deck entfernen?")) return;
+          p.decks = p.decks.filter((d) => d !== deck);
+        } else if (b.dataset.act === "addPage") deck.pages.push({ id: rid(), template: "empty" });
+        else if (b.dataset.act === "suggest") {
+          if (deck.pages.length && !confirm("Seiten durch Grundset-Vorschlag ersetzen?")) return;
+          deck.pages = suggestPages(deck.deckType);
+        } else if (b.dataset.act === "up" && idx > 0) [deck.pages[idx - 1], deck.pages[idx]] = [deck.pages[idx], deck.pages[idx - 1]];
+        else if (b.dataset.act === "delPage") deck.pages.splice(idx, 1);
+        else if (b.dataset.act === "show") {
+          ui.tab = "preview";
+          ui.previewDeck = p.decks.indexOf(deck);
+          ui.previewPage = Math.max(0, idx);
+          ui.selCell = null;
+          return render();
+        } else return;
+        save();
+        renderDecks();
+      });
+    });
+  }
+  function templateDevices(t) {
+    if (!t.deviceRole) return [];
+    return devicesByRole(t.deviceRole).filter((d) => !t.deviceTypes || t.deviceTypes.includes(d.type));
+  }
+  function deckCard(deck, di, built) {
+    const p = P();
+    const d = DECKS[deck.deckType];
+    const pagesBuilt = built ? built.pages.filter((x) => x.deckIdx === di) : [];
+    const tplOptions = (cur) => Object.entries(TEMPLATES).filter(([k]) => deck.deckType === "pedal" ? ["pedal", "empty"].includes(k) : k !== "pedal").map(([k, t]) => `<option value="${k}" ${k === cur ? "selected" : ""}>${esc(t.name)}</option>`).join("");
+    const pageRow = (pg, i) => {
+      const t = TEMPLATES[pg.template] || TEMPLATES.empty;
+      const b = pagesBuilt[i];
+      let devSel = "";
+      if (t.multiDevice) {
+        const cams = devicesByRole("ptz");
+        devSel = `<div><div class="cams">${cams.length ? cams.map((c) => `<label><input type="checkbox" name="cam" value="${c.id}" ${(pg.deviceIds || []).includes(c.id) ? "checked" : ""}>${esc(c.params.title || c.label)}</label>`).join("") : '<span class="warn">Keine PTZ-Kamera angelegt</span>'}</div>
+        <div class="row" style="margin-top:6px"><label class="f" style="flex:1">Tally von<select name="mixer"><option value="">– kein Tally –</option>${devicesByRole("mixer").map((m) => `<option value="${m.id}" ${m.id === pg.mixerId ? "selected" : ""}>${esc(devName(m))}</option>`).join("")}</select></label>
+        <label class="f" style="flex:1">RP-Controller mitschalten<select name="rp"><option value="">– aus –</option>${devicesByRole("rp").map((m) => `<option value="${m.id}" ${m.id === pg.rpId ? "selected" : ""}>${esc(devName(m))}</option>`).join("")}</select></label></div></div>`;
+      } else if (t.deviceRole) {
+        const list = templateDevices(t);
+        devSel = list.length ? `<select name="device">${list.map((x) => `<option value="${x.id}" ${x.id === pg.deviceId ? "selected" : ""}>${esc(devName(x))}</option>`).join("")}</select>` : `<span class="warn">Kein passendes Gerät angelegt</span>`;
+      } else devSel = `<small class="muted">${esc(t.describe)}</small>`;
+      const issues = b ? [b.report.warning, b.report.dropped.length ? `${b.report.dropped.length} Taste(n) passen nicht` : "", b.report.droppedEncoders.length && d.encoders.length ? `${b.report.droppedEncoders.length} Regler ohne Platz` : ""].filter(Boolean) : [];
+      return `<div class="page-row" data-page="${pg.id}">
+      <span class="num">${b ? b.number : "–"}</span>
+      <select name="template">${tplOptions(pg.template)}</select>
+      <input name="title" placeholder="${esc(t.name)}" value="${esc(pg.title || "")}" maxlength="16">
+      <div>${devSel}${issues.length ? `<div class="hint warn">${esc(issues.join(" · "))}</div>` : ""}</div>
+      <div class="list-actions"><button class="ghost" data-act="show" title="Vorschau">👁</button><button class="ghost" data-act="up" title="nach oben">↑</button><button class="ghost" data-act="delPage" title="Seite entfernen">✕</button></div>
+    </div>`;
+    };
+    return `<div class="card" data-deck="${deck.id}">
+    <div class="card-head">
+      <div class="row">
+        <select name="deckType" style="width:auto">${Object.entries(DECKS).map(([k, x]) => `<option value="${k}" ${k === deck.deckType ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select>
+        <input name="deckName" value="${esc(deck.name || "")}" placeholder="Bezeichnung (z. B. Regie links)" style="width:220px">
+      </div>
+      <div class="list-actions">
+        <button class="btn" data-act="suggest">Grundset neu vorschlagen</button>
+        <button class="btn" data-act="addPage">＋ Seite</button>
+        <button class="btn danger" data-act="delDeck">Entfernen</button>
+      </div>
+    </div>
+    ${["plus", "plus-xl"].includes(deck.deckType) ? `<label class="f check" style="margin:4px 0 6px"><input type="checkbox" name="swipe" ${deck.swipe ?? deck.deckType === "plus" ? "checked" : ""}> Seitenwechsel per Wischen über den LCD-Streifen (spart die Navigationstaste – in Companion bei der Surface „Horizontal Swipe Changes Page“ einschalten)</label>` : ""}
+    <small class="muted">${d.keys.length} Tasten · ${d.encoders.length} Drehregler${d.lcd.length ? " · LCD-Streifen" : ""}${d.noDisplay ? " · ohne Display" : ""}${d.aliases.length ? ` · gilt auch für: ${d.aliases.join(", ")}` : ""}</small>
+    ${deck.pages.map(pageRow).join("")}
+  </div>`;
+  }
+  function safeBuild() {
+    try {
+      return buildProject(P());
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
+  }
+  var hex = (n) => "#" + Number(n ?? 0).toString(16).padStart(6, "0");
+  function displayText(meta) {
+    let t = String(meta.text ?? "");
+    if (meta.textExpression) {
+      t = t.replace(/^'([^']*)\\n'.*$/s, "$1\n…");
+    }
+    return t.replace(/\\n/g, "\n").replace(/\$\(([\w-]+):([\w.]+)\)/g, (_, c, v2) => `‹${v2.replace(/^input_|^short_|^output_/, "").replace(/_volume$/, " vol")}›`);
+  }
+  function renderPreview() {
+    const el = $("#tab-preview");
+    const p = P();
+    const built = safeBuild();
+    if (!p.decks.length || !built) {
+      el.innerHTML = `<div class="card empty">Noch kein Stream Deck angelegt.</div>`;
+      return;
+    }
+    ui.previewDeck = Math.min(ui.previewDeck, p.decks.length - 1);
+    const deckCfg = p.decks[ui.previewDeck];
+    const deck = DECKS[deckCfg.deckType];
+    const pages = built.pages.filter((x) => x.deckIdx === ui.previewDeck);
+    ui.previewPage = Math.min(ui.previewPage, Math.max(0, pages.length - 1));
+    const pg = pages[ui.previewPage];
+    const cells = pg?.report.cells || {};
+    const avail = Math.min(window.innerWidth - 32, (el.clientWidth || window.innerWidth) - (window.innerWidth > 900 ? 356 : 0));
+    const gap = 8;
+    const k = Math.max(30, Math.min(deck.cols > 10 ? 52 : deck.cols > 6 ? 66 : 76, Math.floor((avail - 34 - (deck.cols - 1) * gap) / deck.cols)));
+    const occupied = /* @__PURE__ */ new Map();
+    const items = [];
+    for (const [r, c] of deck.keys) items.push({ r, c, kind: "key" });
+    for (const [r, c] of deck.encoders) items.push({ r, c, kind: "encSlot" });
+    for (const [r, c, span] of deck.lcd) for (let x = c; x < c + span; x++) items.push({ r, c: x, kind: "lcdSlot" });
+    for (const it of items) occupied.set(`${it.r}/${it.c}`, it);
+    let gridHtml = "";
+    for (const it of items) {
+      const meta = cells[`${it.r}/${it.c}`];
+      const pos = `grid-row:${it.r + 1};grid-column:${it.c + 1}`;
+      const cls = it.kind === "encSlot" ? "enc" : it.kind === "lcdSlot" ? "lcd" : "";
+      if (!meta) {
+        gridHtml += `<div class="cell empty ${cls}" style="${pos}"></div>`;
+        continue;
+      }
+      const sel2 = ui.selCell === `${it.r}/${it.c}` ? "sel" : "";
+      const fbs = (meta.feedbacks || []).length;
+      const style = it.kind === "encSlot" ? "" : `background:${hex(meta.bgcolor)};color:${hex(meta.color ?? 16777215)}`;
+      gridHtml += `<div class="cell ${cls} ${meta.kind === "nav" ? "nav" : ""} ${sel2} ${deck.encoders.find(([r, c, , ring]) => r === it.r && c === it.c && ring) ? "ring" : ""}" data-cell="${it.r}/${it.c}" style="${pos};${style}"><span>${esc(displayText(meta))}</span>${fbs ? '<i class="fb" title="mit Rückmeldung"></i>' : ""}</div>`;
+    }
+    const sel = ui.selCell && cells[ui.selCell];
+    el.innerHTML = `
+    <div class="deck-tabs">${p.decks.map((d, i) => `<button data-deck="${i}" class="${i === ui.previewDeck ? "active" : ""}">${esc(d.name || DECKS[d.deckType].name)}</button>`).join("")}</div>
+    <div class="deck-tabs">${pages.map((x, i) => `<button data-pg="${i}" class="${i === ui.previewPage ? "active" : ""}">Seite ${x.number}: ${esc(x.title)}</button>`).join("")}</div>
+    <div class="preview-wrap">
+      <div>
+        <div class="deck" style="--k:${k}px;font-size:${k < 50 ? 8 : 11}px;grid-template-columns:repeat(${deck.cols}, var(--k))">${gridHtml}</div>
+        ${pg ? reportHtml(pg, deck) : ""}
+      </div>
+      <div class="card detail">${sel ? detailHtml(sel) : '<p class="muted">Taste, LCD-Feld oder Drehregler antippen, um Aktionen und Rückmeldungen zu sehen.</p><p class="hint">Grüner Punkt = Taste hat Feedback (Rückmeldung vom Gerät). ‹name› = wird live aus der Companion-Variable gefüllt.</p>'}</div>
+    </div>`;
+    el.querySelectorAll("[data-deck]").forEach((b) => b.onclick = () => (ui.previewDeck = Number(b.dataset.deck), ui.previewPage = 0, ui.selCell = null, renderPreview()));
+    el.querySelectorAll("[data-pg]").forEach((b) => b.onclick = () => (ui.previewPage = Number(b.dataset.pg), ui.selCell = null, renderPreview()));
+    el.querySelectorAll("[data-cell]").forEach((c) => c.onclick = () => (ui.selCell = c.dataset.cell, renderPreview()));
+  }
+  function reportHtml(pg, deck) {
+    const r = pg.report;
+    const li = [];
+    if (r.warning) li.push(`<li class="warn">${esc(r.warning)}</li>`);
+    if (r.dropped.length) li.push(`<li class="warn">Kein Platz für: ${esc(r.dropped.map((x) => displayText(x.btn).replace(/\n/g, " ")).join(", "))}</li>`);
+    if (r.droppedEncoders.length && deck.encoders.length) li.push(`<li class="warn">Regler ohne Platz: ${esc(r.droppedEncoders.map((e) => e.name || displayText(e).split("\n")[0]).join(", "))}</li>`);
+    if (r.droppedEncoders.length && !deck.encoders.length) li.push(`<li>Dieses Deck hat keine Drehregler – Regler-Funktionen ${P().encodersAsKeys ? "wurden (wo sinnvoll) als −/+ Tasten angelegt" : "entfallen"}.</li>`);
+    return li.length ? `<ul class="report">${li.join("")}</ul>` : "";
+  }
+  function describeEntity(e, devLabels, depth = 0) {
+    const pad = "  ".repeat(depth);
+    const conn = e.connectionId === "internal" ? "internal" : devLabels[e.connectionId] || e.connectionId;
+    const opts = Object.entries(e.options || {}).map(([k, v2]) => `${k}=${v2?.isExpression ? "{" + v2.value + "}" : JSON.stringify(v2?.value)}`).join(", ");
+    let s = `${pad}${conn}: ${e.definitionId}${opts ? " (" + opts + ")" : ""}
+`;
+    for (const [g, ch] of Object.entries(e.children || {})) if (ch?.length) s += `${pad}  └ ${g}:
+` + ch.map((c) => describeEntity(c, devLabels, depth + 2)).join("");
+    return s;
+  }
+  function detailHtml(meta) {
+    const devLabels = Object.fromEntries(P().devices.map((d) => [d.id, cleanLabel(d.label)]));
+    const list = (arr) => arr && arr.length ? `<pre>${esc(arr.map((e) => describeEntity(e, devLabels)).join(""))}</pre>` : "<pre>–</pre>";
+    const kindName = { key: "Taste", lcd: "LCD-Feld (Touch)", encoder: "Drehregler", nav: "Navigation" }[meta.kind] || meta.kind;
+    return `<h3>${esc(kindName)}</h3>
+    ${meta.info ? `<p class="hint">${esc(meta.info)}</p>` : ""}
+    <h4>Text</h4><pre>${esc(String(meta.text).replace(/\\n/g, "\n"))}${meta.textExpression ? "\n(Expression)" : ""}</pre>
+    ${meta.kind === "encoder" ? `<h4>Links drehen</h4>${list(meta.left)}<h4>Rechts drehen</h4>${list(meta.right)}<h4>Drücken</h4>${list(meta.down)}` : `<h4>Drücken</h4>${list(meta.down)}${meta.up?.length ? `<h4>Loslassen</h4>${list(meta.up)}` : ""}`}
+    <h4>Rückmeldungen (Feedbacks)</h4>${list(meta.feedbacks)}`;
+  }
+  function renderExport() {
+    const el = $("#tab-export");
+    const p = P();
+    const built = safeBuild();
+    const pages = built ? built.pages : [];
+    const used = built ? [...built.used].map((id) => built.devById[id]) : [];
+    el.innerHTML = `
+    <div class="card">
+      <h2>Komplette Konfiguration</h2>
+      <p>Alle ${pages.length} Seiten, ${used.length} Verbindung(en)${p.decks.some((d) => d.pages.some((x) => x.template === "ptz")) ? " und die PTZ-Custom-Variables" : ""} in einer Datei.</p>
+      <div class="row">
+        <button class="btn primary" id="expFull" ${pages.length ? "" : "disabled"}>⬇ ${esc(cleanLabel(p.name))}.companionconfig</button>
+      </div>
+      <p class="hint">In Companion: <b>Import / Export → Import</b> → Datei wählen → „Full Import“. Bei <b>Buttons</b> und <b>Custom Variables</b> „Reset and Import“ wählen, <b>Connections</b> auf „Unchanged“ lassen, damit bestehende Verbindungen mit gleichem Namen weiterverwendet werden. Achtung: Reset ersetzt alle Tasten der Companion-Installation.</p>
+    </div>
+    <div class="card">
+      <h2>Einzelne Seiten</h2>
+      <p class="hint">Zum Einfügen in eine bestehende Companion-Konfiguration: Datei importieren und die Zielseite wählen. Verbindungen werden über den Namen zugeordnet oder neu angelegt.</p>
+      ${pages.map((x) => `<div class="row" style="margin:6px 0"><button class="btn" data-page="${x.number}">⬇ Seite ${x.number} – ${esc(x.title)}</button><small class="muted">${esc(p.decks[x.deckIdx].name || DECKS[p.decks[x.deckIdx].deckType].name)}</small></div>`).join("") || '<p class="muted">Keine Seiten.</p>'}
+    </div>
+    <div class="card">
+      <h2>Optionen</h2>
+      <label class="f check"><input type="checkbox" id="optEnc" ${p.encodersAsKeys !== false ? "checked" : ""}> Drehregler-Funktionen auf Decks ohne Regler als −/+ Tasten anlegen</label>
+      <label class="f check"><input type="checkbox" id="optPin" ${p.pinModuleVersions ? "checked" : ""}> Modulversion festschreiben (sonst: neueste installierte Version)</label>
+      <h3 style="margin-top:12px">Benötigte Companion-Module</h3>
+      <ul>${[...new Set(used.map((d) => d.type))].map((t) => `<li><code>${DEVICE_TYPES[t].moduleId}</code> – geprüft mit v${DEVICE_TYPES[t].moduleVersion}</li>`).join("") || '<li class="muted">–</li>'}</ul>
+      <p class="hint">Erfordert Companion 4.3 oder neuer (Exportformat v12). Companion 4.0–4.2 lehnt die Datei als „zu neu“ ab.</p>
+    </div>`;
+    $("#expFull")?.addEventListener("click", () => download(`${cleanLabel(p.name)}.companionconfig`, exportFull(p)));
+    el.querySelectorAll("[data-page]").forEach((b) => b.onclick = () => download(`${cleanLabel(p.name)}_seite${b.dataset.page}.companionconfig`, exportSinglePage(p, Number(b.dataset.page))));
+    $("#optEnc").onchange = (e) => (p.encodersAsKeys = e.target.checked, save(), renderExport());
+    $("#optPin").onchange = (e) => (p.pinModuleVersions = e.target.checked, save());
+  }
+  function renderSettings() {
+    const el = $("#tab-settings");
+    el.innerHTML = `
+    <div class="card">
+      <h2>Kabelplan-Kopplung</h2>
+      <label class="f check"><input type="checkbox" id="setKp" ${settings.kabelplan ? "checked" : ""}> Mit dem Kabelplan-Tool zusammenarbeiten</label>
+      <p class="hint">Eingeschaltet: Im Reiter „Geräte“ erscheint „Aus Kabelplan übernehmen“. Der Builder liest die Schnittstelle des Kabelplans (ab Version 2.2, <code>${BRIDGE_KEY}</code>) – automatisch funktioniert das, wenn beide unter <code>klaus-kleem.github.io</code> im selben Browser laufen (z. B. beide als Tab in Safari oder Chrome). Am iPad hat jede Home-Bildschirm-App ihren eigenen Speicher – dort im Kabelplan unter Pläne → „Für Companion exportieren“ kopieren und hier „Aus Zwischenablage einfügen“, oder die Datei laden.</p>
+      <p class="hint">${readBridge() ? `✓ Kabelplan-Daten gefunden: ${readBridge().plans.length} Plan/Pläne` : "Noch keine Kabelplan-Daten in diesem Browser gefunden."}</p>
+    </div>
+    <div class="card">
+      <h2>Darstellung</h2>
+      <label class="f" style="max-width:220px">Farbschema<select id="setTheme">
+        ${[["auto", "System"], ["dark", "Dunkel"], ["light", "Hell"]].map(([k, n]) => `<option value="${k}" ${settings.theme === k ? "selected" : ""}>${n}</option>`).join("")}
+      </select></label>
+    </div>
+    <div class="card">
+      <h2>Über</h2>
+      <p>Companion Builder v${VERSION} · läuft komplett offline (Service Worker). Daten bleiben im Browser dieses Geräts.</p>
+      <button class="btn" id="setUpdate">Nach Update suchen</button>
+    </div>`;
+    $("#setKp").onchange = (e) => {
+      settings.kabelplan = e.target.checked;
+      store.set(LS_SETTINGS, settings);
+      if (settings.kabelplan) publishDevices(P());
+      toast(settings.kabelplan ? "Kabelplan-Kopplung aktiv" : "Kabelplan-Kopplung aus");
+    };
+    $("#setTheme").onchange = (e) => {
+      settings.theme = e.target.value;
+      store.set(LS_SETTINGS, settings);
+      render();
+    };
+    $("#setUpdate").onclick = async () => {
+      const reg = await navigator.serviceWorker?.getRegistration();
+      if (!reg) return toast("Kein Service Worker aktiv");
+      await reg.update();
+      toast("Geprüft – neue Version wird beim nächsten Start geladen");
+    };
+  }
+  if ("serviceWorker" in navigator && location.protocol !== "file:") navigator.serviceWorker.register("sw.js").catch(() => {
+  });
+  render();
+  window.addEventListener("resize", () => ui.tab === "preview" && renderPreview());
+})();
+</script>
+</body>
+</html>
