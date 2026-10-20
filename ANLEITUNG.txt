@@ -1,27 +1,22 @@
-KLEEM Kabelplan – Update auf Version 2
+KLEEM Kabelplan – Update auf Version 2.1
 
-VOR DEM UPDATE
-1. Kabelplan am iPad öffnen > Pläne > Backup erstellen > Datei speichern.
+NEU
+- SDI 3G/HD und SDI 12G sind eigene Kabeltypen (Farbe und Linienart in Bibliothek > Kabeltypen einstellbar).
+- Geräte heißen im Plan wie das echte Gerät, z. B. "Panasonic AW-UE160 #1" statt "CAM 1".
+- Komplette ATEM-Reihe (Constellation HD/4K, Television Studio, Mini, SDI, Streaming Bridge, Microphone Converter).
 
-DATEIEN AUF GITHUB ERSETZEN
-2. Diese ZIP in der Dateien-App entpacken.
-3. github.com/Klaus-KleeM/Kabelplan öffnen > Add file > Upload files.
-4. Alle Dateien aus dem Ordner auswählen (index.html, sw.js, manifest.webmanifest, icon-*.png, ANLEITUNG.txt).
-   Gleichnamige Dateien werden automatisch ersetzt.
-5. Ganz unten "Commit changes" tippen.
-6. Unter "Actions" auf den grünen Haken warten (1–3 Minuten).
+UPDATE
+1. Am iPad: Kabelplan > Pläne > Backup erstellen > Datei speichern.
+2. ZIP in der Dateien-App entpacken.
+3. In Safari github.com/Klaus-KleeM/Kabelplan/upload/main öffnen.
+4. Alle Dateien aus dem Ordner auswählen, unten "Commit changes" tippen.
+5. Unter "Actions" auf den grünen Haken warten.
+6. Kabelplan über das Home-Symbol öffnen, 10 Sekunden warten, ganz schließen, wieder öffnen.
+   Unter "Pläne" steht dann "Auf Version 2.1 aktualisiert".
 
-AM IPAD AKTUALISIEREN
-7. Kabelplan über das Home-Symbol öffnen, ca. 10 Sekunden warten.
-8. App ganz schließen (von unten wischen, Karte wegschieben).
-9. Wieder öffnen. Jetzt läuft Version 2 und zeigt "Auf Version 2 aktualisiert".
-   Falls noch Version 1 erscheint: Schritt 7–9 wiederholen.
-
-WAS DABEI PASSIERT
-- Deine Pläne bleiben erhalten. Das Beispiel wird neu erzeugt.
-- Die Bibliothek wird durch die neue (74 Geräte) ersetzt; deine bisherigen Geräte werden über den Namen zugeordnet.
-- Bestehende Pläne behalten ihre alten Geräte-Kopien. Neue Anschlüsse holst du pro Gerät in der Bibliothek mit
-  "In aktuellen Plan übernehmen" (dabei werden Kabel zu nicht mehr vorhandenen Anschlüssen entfernt).
-
-FALLS ETWAS SCHIEFGEHT
-- Pläne > Backup oder Plan laden > die gesicherte Datei wählen.
+WAS MIT DEINEN DATEN PASSIERT
+- Pläne bleiben erhalten. Bisherige SDI-Kabel werden je nach Klasse zu "SDI 3G/HD" oder "SDI 12G".
+- Bezeichnungen wie "CAM 1" oder der reine Modellname werden auf "Hersteller Modell #n" umgestellt.
+  Selbst vergebene Namen bleiben unverändert.
+- Lagerstückzahlen, Handbuch-Links und eigene Änderungen an Geräten bleiben erhalten.
+  Nur die ATEM-Einträge werden durch die neuen, vollständigen ersetzt (Stückzahl bleibt).
