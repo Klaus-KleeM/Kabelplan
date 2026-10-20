@@ -1,22 +1,16 @@
-KLEEM Kabelplan – Update auf Version 2.1
+KLEEM Kabelplan – Update auf Version 2.2
 
 NEU
-- SDI 3G/HD und SDI 12G sind eigene Kabeltypen (Farbe und Linienart in Bibliothek > Kabeltypen einstellbar).
-- Geräte heißen im Plan wie das echte Gerät, z. B. "Panasonic AW-UE160 #1" statt "CAM 1".
-- Komplette ATEM-Reihe (Constellation HD/4K, Television Studio, Mini, SDI, Streaming Bridge, Microphone Converter).
+- Lager-Job laden: Pläne > "Datei laden" oder "Aus Zwischenablage einfügen" – legt den Plan mit den Geräten an
+  (optional gleich mit Auto-Verkabelung) und übernimmt Lagerstückzahlen.
+- Packliste > "An Lager übergeben": Geräte, Kabel, Zubehör, Software als Datei fürs Lagerprogramm.
+- Companion-Schnittstelle: Geräte, Verbindungen und IPs werden für den Companion-Builder bereitgestellt.
+- Pläne > "Geräteliste für das Lager": alle Bibliotheks-IDs als CSV zum Zuordnen im Lager.
+- Details zu den Formaten: SCHNITTSTELLE.md
 
 UPDATE
-1. Am iPad: Kabelplan > Pläne > Backup erstellen > Datei speichern.
-2. ZIP in der Dateien-App entpacken.
-3. In Safari github.com/Klaus-KleeM/Kabelplan/upload/main öffnen.
-4. Alle Dateien aus dem Ordner auswählen, unten "Commit changes" tippen.
-5. Unter "Actions" auf den grünen Haken warten.
-6. Kabelplan über das Home-Symbol öffnen, 10 Sekunden warten, ganz schließen, wieder öffnen.
-   Unter "Pläne" steht dann "Auf Version 2.1 aktualisiert".
-
-WAS MIT DEINEN DATEN PASSIERT
-- Pläne bleiben erhalten. Bisherige SDI-Kabel werden je nach Klasse zu "SDI 3G/HD" oder "SDI 12G".
-- Bezeichnungen wie "CAM 1" oder der reine Modellname werden auf "Hersteller Modell #n" umgestellt.
-  Selbst vergebene Namen bleiben unverändert.
-- Lagerstückzahlen, Handbuch-Links und eigene Änderungen an Geräten bleiben erhalten.
-  Nur die ATEM-Einträge werden durch die neuen, vollständigen ersetzt (Stückzahl bleibt).
+1. Kabelplan > Pläne > Backup erstellen.
+2. ZIP entpacken, in Safari github.com/Klaus-KleeM/Kabelplan/upload/main öffnen.
+3. Alle Dateien auswählen, "Commit changes", grünen Haken unter Actions abwarten.
+4. Kabelplan öffnen, 10 Sekunden warten, ganz schließen, wieder öffnen.
+Deine Daten bleiben unverändert.
