@@ -1767,19 +1767,16 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
         if (d && t?.deviceRole) return DEVICE_TYPES[d.type].short;
         return t?.name || "Seite";
       };
-      const pagesForDeck = deckCfg.pages.map((p, i) => ({ number: pageNo + i, title: p.title || autoTitle(p) }));
       const hasDial = ["plus", "plus-xl"].includes(deckCfg.deckType);
       const pageNav = deckCfg.pageNav || (hasDial ? "swipe" : deckCfg.swipe ?? false ? "swipe" : "keys");
-      const dialNav = hasDial && pageNav === "dial" && pagesForDeck.length > 1;
-      const swipe = pageNav === "swipe" || dialNav;
-      const slots = navSlots(deckCfg.deckType, pagesForDeck.length, swipe && (dialNav || DECKS[deckCfg.deckType].lcd.length > 0) && deckCfg.deckType !== "neo");
-      deckCfg.pages.forEach((p, i) => {
+      const navFor = (count) => {
+        const dialNav = hasDial && pageNav === "dial" && count > 1;
+        const swipe = pageNav === "swipe" || dialNav;
+        return { dialNav, slots: navSlots(deckCfg.deckType, count, swipe && (dialNav || DECKS[deckCfg.deckType].lcd.length > 0) && deckCfg.deckType !== "neo") };
+      };
+      const buildOne = (p, slots) => {
         const tpl = TEMPLATES[p.template];
-        const ctx = {
-          rowWidth: rowWidth(deck),
-          hasEncoders: deck.encoders.length > 0,
-          keyCount: deck.keys.length - slots.length
-        };
+        const ctx = { rowWidth: rowWidth(deck), hasEncoders: deck.encoders.length > 0, keyCount: deck.keys.length - slots.length };
         if (tpl.multiDevice) {
           ctx.cams = (p.deviceIds || []).map((id) => devById[id]).filter(Boolean);
           ctx.mixer = devById[p.mixerId] || null;
@@ -1791,16 +1788,43 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
           ctx.dev = devById[p.deviceId];
           if (ctx.dev) used.add(ctx.dev.id);
         }
-        let built;
         const missing = tpl.multiDevice ? ctx.cams.length === 0 : tpl.deviceRole && !ctx.dev;
-        if (missing) built = { title: pagesForDeck[i].title, keys: [], encoders: [], warning: "Kein Gerät zugewiesen" };
-        else built = tpl.build(ctx);
+        return missing ? { keys: [], encoders: [], warning: "Kein Gerät zugewiesen" } : tpl.build(ctx);
+      };
+      // Seiten mit mehr Drehreglern als das Deck hat auf mehrere Seiten aufteilen (z. B. Audio)
+      const expand = (slots, dialNav) => {
+        const cap = deck.encoders.length - (dialNav ? 1 : 0);
+        const list = [];
+        deckCfg.pages.forEach((p) => {
+          const b = buildOne(p, slots);
+          const n = (b.encoders || []).length;
+          const parts = cap > 0 && n > cap && p.splitEncoders !== false ? Math.ceil(n / cap) : 1;
+          for (let k = 0; k < parts; k++) list.push({ p, b, k, parts, cap });
+        });
+        return list;
+      };
+      let nav = navFor(deckCfg.pages.length);
+      let entries = expand(nav.slots, nav.dialNav);
+      const nav2 = navFor(entries.length);
+      if (nav2.slots.length !== nav.slots.length || nav2.dialNav !== nav.dialNav) {
+        nav = nav2;
+        entries = expand(nav.slots, nav.dialNav);
+      }
+      const pagesForDeck = entries.map((e, i) => {
+        const base = e.p.title || autoTitle(e.p);
+        return { number: pageNo + i, title: e.parts > 1 ? `${base} ${e.k + 1}/${e.parts}` : base };
+      });
+      entries.forEach((e, i) => {
+        const p = e.p;
+        const built = { ...e.b };
+        if (e.parts > 1) built.encoders = e.b.encoders.slice(e.k * e.cap, (e.k + 1) * e.cap);
         built.title = pagesForDeck[i].title;
-        const { page, report } = buildPage(deckCfg.deckType, built, { slots, pages: pagesForDeck, current: i, dial: dialNav }, { encodersAsKeys: project.encodersAsKeys !== false, pageNumber: pagesForDeck[i].number, prefs: p.keyPrefs || {}, listEncoder: p.listEncoder !== false });
+        const { page, report } = buildPage(deckCfg.deckType, built, { slots: nav.slots, pages: pagesForDeck, current: i, dial: nav.dialNav }, { encodersAsKeys: project.encodersAsKeys !== false, pageNumber: pagesForDeck[i].number, prefs: p.keyPrefs || {}, listEncoder: p.listEncoder !== false });
         if (built.warning) report.warning = built.warning;
+        if (e.parts > 1) report.split = `${e.k + 1}/${e.parts}`;
         out.push({ number: pagesForDeck[i].number, deckIdx, pageId: p.id, title: built.title, page, report });
       });
-      pageNo += deckCfg.pages.length;
+      pageNo += entries.length;
     });
     return { pages: out, used, devById };
   }
@@ -2518,7 +2542,8 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
         else if (b.dataset.act === "show") {
           ui.tab = "preview";
           ui.previewDeck = p.decks.indexOf(deck);
-          ui.previewPage = Math.max(0, idx);
+          const bp = (safeBuild()?.pages || []).filter((x) => x.deckIdx === p.decks.indexOf(deck));
+          ui.previewPage = Math.max(0, bp.findIndex((x) => x.pageId === deck.pages[idx]?.id));
           ui.selCell = null;
           return render();
         } else return;
@@ -2538,7 +2563,10 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
     const tplOptions = (cur) => Object.entries(TEMPLATES).filter(([k]) => deck.deckType === "pedal" ? ["pedal", "empty"].includes(k) : k !== "pedal").map(([k, t]) => `<option value="${k}" ${k === cur ? "selected" : ""}>${esc(t.name)}</option>`).join("");
     const pageRow = (pg, i) => {
       const t = TEMPLATES[pg.template] || TEMPLATES.empty;
-      const b = pagesBuilt[i];
+      const bs = pagesBuilt.filter((x) => x.pageId === pg.id);
+      const b = bs[0] ? { ...bs[0], number: bs.length > 1 ? `${bs[0].number}–${bs[bs.length - 1].number}` : bs[0].number,
+        report: { ...bs[0].report, dropped: bs.flatMap((x) => x.report.dropped), droppedEncoders: bs.flatMap((x) => x.report.droppedEncoders) } } : null;
+      const splitNote = bs.length > 1 ? `Auf ${bs.length} Seiten aufgeteilt (zu viele Drehregler)` : "";
       let devSel = "";
       if (t.multiDevice) {
         const cams = devicesByRole("ptz");
@@ -2549,7 +2577,7 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
         const list = templateDevices(t);
         devSel = list.length ? `<select name="device">${list.map((x) => `<option value="${x.id}" ${x.id === pg.deviceId ? "selected" : ""}>${esc(devName(x))}</option>`).join("")}</select>` : `<span class="warn">Kein passendes Gerät angelegt</span>`;
       } else devSel = `<small class="muted">${esc(t.describe)}</small>`;
-      const issues = b ? [b.report.warning, b.report.dropped.length ? `${b.report.dropped.length} Taste(n) passen nicht` : "", b.report.droppedEncoders.length && d.encoders.length ? `${b.report.droppedEncoders.length} Regler ohne Platz` : ""].filter(Boolean) : [];
+      const issues = b ? [b.report.warning, splitNote, b.report.dropped.length ? `${b.report.dropped.length} Taste(n) passen nicht` : "", b.report.droppedEncoders.length && d.encoders.length ? `${b.report.droppedEncoders.length} Regler ohne Platz` : ""].filter(Boolean) : [];
       return `<div class="page-row" data-page="${pg.id}">
       <span class="num">${b ? b.number : "–"}</span>
       <select name="template">${tplOptions(pg.template)}</select>
