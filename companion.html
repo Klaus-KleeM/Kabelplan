@@ -1579,6 +1579,36 @@ ${v(dev, "pmem")}`,
 +`, bgcolor: 2107962, down: e.right, info: `${title} hoch` } }
     ];
   }
+  function plainLabel(btn) {
+    return String(btn?.text ?? "").replace(/^'|'$/g, "").replace(/\$\([^)]*\)/g, "").replace(/\\n|\n/g, " ").replace(/\s+/g, " ").trim();
+  }
+  function itemKey(it) {
+    return `${it.group || ""}|${plainLabel(it.btn) || it.btn?.info || ""}`;
+  }
+  /** Übrige Tasten auf einen Drehregler legen: drehen = auswählen, drücken = auslösen */
+  function listEncoder(items, varName) {
+    const n = items.length;
+    const v3 = `$(custom:${varName})`;
+    const q = (t) => String(t).replace(/\\/g, "").replace(/'/g, "’");
+    const labels = items.map((it, i) => q(plainLabel(it.btn) || it.btn?.info || `Taste ${i + 1}`));
+    let text = `'1/${n}\\n${labels[0]}'`;
+    for (let i = 2; i <= n; i++) text = `${v3} == ${i} ? '${i}/${n}\\n${labels[i - 1]}' : ${text}`;
+    // rechts: 1→2 … n→1 (unbelegt → 2), links: 1→n … (unbelegt → n)
+    let right = n >= 2 ? "2" : "1", left = String(n);
+    for (let i = n; i >= 1; i--) {
+      right = `${v3} == ${i} ? ${i === n ? 1 : i + 1} : ${right}`;
+      left = `${v3} == ${i} ? ${i === 1 ? n : i - 1} : ${left}`;
+    }
+    const push = items.map((it, i) => internal.ifThen([internal.checkExpr(i === 0 ? `!(${v3} >= 2)` : `${v3} == ${i + 1}`)], it.btn.down || []));
+    return {
+      text, textExpression: true, size: 14, isList: true,
+      right: [internal.setVar(varName, right, true)],
+      left: [internal.setVar(varName, left, true)],
+      push,
+      info: `Blättern: ${labels.join(" · ")} – drehen wählt, drücken löst aus`,
+      listItems: labels
+    };
+  }
   function buildPage(deckId, built, nav, options = {}) {
     const deck = DECKS[deckId];
     const report = { dropped: [], droppedEncoders: [] };
@@ -1589,8 +1619,16 @@ ${v(dev, "pmem")}`,
       meta && (report.cells = report.cells || {}, report.cells[`${r}/${c}`] = meta);
     };
     const encSlots = deck.encoders;
-    let encs = built.encoders || [];
-    let keyItems = built.keys.slice();
+    let encs = (built.encoders || []).slice();
+    const prefs = options.prefs || {};
+    const order = new Map(built.keys.map((k, i) => [k, i]));
+    const hidden = [];
+    let keyItems = [];
+    built.keys.forEach((k) => {
+      const pr = prefs[itemKey(k)];
+      if (pr === "hide" && encSlots.length) hidden.push(k);
+      else keyItems.push(pr === "show" ? { ...k, prio: -100 } : k);
+    });
     if (encSlots.length === 0) {
       encs.forEach((e, i) => {
         if (options.encodersAsKeys && !e.noKeys) keyItems.push(...encoderAsKeys(e, i));
@@ -1661,10 +1699,28 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
     }
     const reserved = nav ? nav.slots : [];
     const { placed, dropped } = placeKeys(deck, keyItems, reserved);
-    report.dropped = dropped;
+    const over = [...hidden, ...dropped].sort((a, b) => (order.get(a) ?? order.get(built.keys.find((k) => itemKey(k) === itemKey(a))) ?? 0) - (order.get(b) ?? order.get(built.keys.find((k) => itemKey(k) === itemKey(b))) ?? 0));
+    const freeEnc = encSlots.length - encs.length;
+    report.dropped = over;
+    report.onEncoder = [];
+    if (over.length && freeEnc > 0 && options.listEncoder !== false) {
+      const varName = `kb_list_p${options.pageNumber || 0}`;
+      const le = listEncoder(over, varName);
+      const i = encs.length;
+      const [r, c, lcd] = encSlots[i];
+      const btn = { text: le.text, textExpression: true, size: 14, bgcolor: COLORS.black, down: le.push, left: le.left, right: le.right, rotary: true, feedbacks: [] };
+      set(r, c, makeButton(btn), { kind: "encoder", ...btn, info: le.info, isList: true, listItems: le.listItems });
+      if (lcd) {
+        const lcdBtn = { ...btn, rotary: false, left: void 0, right: void 0, bgcolor: 1717280 };
+        set(lcd[0], lcd[1], makeButton(lcdBtn), { kind: "lcd", ...lcdBtn, info: le.info, isList: true, listItems: le.listItems });
+      }
+      report.onEncoder = over;
+      report.dropped = [];
+      report.listVar = { name: varName, description: `Seite ${options.pageNumber}: Blätter-Regler (${le.listItems.slice(0, 3).join(", ")}${over.length > 3 ? " …" : ""})` };
+    }
     for (const [rc, it] of placed) {
       const [r, c] = rc.split("/").map(Number);
-      set(r, c, makeButton(it.btn), { kind: "key", ...it.btn });
+      set(r, c, makeButton(it.btn), { kind: "key", ...it.btn, itemKey: itemKey(it), pref: prefs[itemKey(it)] });
     }
     const allRows = Object.keys(controls).map(Number);
     const allCols = Object.values(controls).flatMap((o) => Object.keys(o).map(Number));
@@ -1721,9 +1777,9 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
         if (missing) built = { title: pagesForDeck[i].title, keys: [], encoders: [], warning: "Kein Gerät zugewiesen" };
         else built = tpl.build(ctx);
         built.title = pagesForDeck[i].title;
-        const { page, report } = buildPage(deckCfg.deckType, built, { slots, pages: pagesForDeck, current: i }, { encodersAsKeys: project.encodersAsKeys !== false });
+        const { page, report } = buildPage(deckCfg.deckType, built, { slots, pages: pagesForDeck, current: i }, { encodersAsKeys: project.encodersAsKeys !== false, pageNumber: pagesForDeck[i].number, prefs: p.keyPrefs || {}, listEncoder: p.listEncoder !== false });
         if (built.warning) report.warning = built.warning;
-        out.push({ number: pagesForDeck[i].number, deckIdx, title: built.title, page, report });
+        out.push({ number: pagesForDeck[i].number, deckIdx, pageId: p.id, title: built.title, page, report });
       });
       pageNo += deckCfg.pages.length;
     });
@@ -1772,6 +1828,9 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
   }
   function exportFull(project) {
     const { pages, used, devById } = buildProject(project);
+    const cv = customVariables(project);
+    let so = Object.keys(cv).length;
+    for (const p of pages) if (p.report.listVar) cv[p.report.listVar.name] = { description: p.report.listVar.description, defaultValue: 1, persistCurrentValue: false, sortOrder: so++ };
     const pageObj = {};
     for (const p of pages) pageObj[p.number] = { id: uid(), ...p.page };
     return {
@@ -1781,7 +1840,7 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
       pages: pageObj,
       instances: exportInstances(project, used, devById),
       connectionCollections: [],
-      custom_variables: customVariables(project),
+      custom_variables: cv,
       customVariablesCollections: []
     };
   }
@@ -1808,8 +1867,22 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
       oldPageNumber: pageNumber
     };
   }
-  function download(filename, obj) {
-    const blob = new Blob([JSON.stringify(obj, null, "	")], { type: "application/json" });
+  async function download(filename, obj) {
+    const text = JSON.stringify(obj, null, "	");
+    // application/octet-stream: sonst hängt Safari am iPad ".json" an und Companion graut die Datei aus
+    const blob = new Blob([text], { type: "application/octet-stream" });
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+    if (ios && navigator.canShare) {
+      try {
+        const file = new File([blob], filename, { type: "application/octet-stream" });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file] });
+          return;
+        }
+      } catch (e) {
+        if (e && e.name === "AbortError") return;
+      }
+    }
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = filename;
@@ -2475,6 +2548,7 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
   }
   var hex = (n) => "#" + Number(n ?? 0).toString(16).padStart(6, "0");
   function displayText(meta) {
+    if (meta.isList) return `⟲ Blättern\n${(meta.listItems || [])[0] || ""} (1/${(meta.listItems || []).length})`;
     let t = String(meta.text ?? "");
     if (meta.textExpression) {
       t = t.replace(/^'([^']*)\\n'.*$/s, "$1\n…");
@@ -2520,6 +2594,7 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
       gridHtml += `<div class="cell ${cls} ${meta.kind === "nav" ? "nav" : ""} ${sel2} ${deck.encoders.find(([r, c, , ring]) => r === it.r && c === it.c && ring) ? "ring" : ""}" data-cell="${it.r}/${it.c}" style="${pos};${style}"><span>${esc(displayText(meta))}</span>${fbs ? '<i class="fb" title="mit Rückmeldung"></i>' : ""}</div>`;
     }
     const sel = ui.selCell && cells[ui.selCell];
+    ui._pg = pg;
     el.innerHTML = `
     <div class="deck-tabs">${p.decks.map((d, i) => `<button data-deck="${i}" class="${i === ui.previewDeck ? "active" : ""}">${esc(d.name || DECKS[d.deckType].name)}</button>`).join("")}</div>
     <div class="deck-tabs">${pages.map((x, i) => `<button data-pg="${i}" class="${i === ui.previewPage ? "active" : ""}">Seite ${x.number}: ${esc(x.title)}</button>`).join("")}</div>
@@ -2533,12 +2608,39 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
     el.querySelectorAll("[data-deck]").forEach((b) => b.onclick = () => (ui.previewDeck = Number(b.dataset.deck), ui.previewPage = 0, ui.selCell = null, renderPreview()));
     el.querySelectorAll("[data-pg]").forEach((b) => b.onclick = () => (ui.previewPage = Number(b.dataset.pg), ui.selCell = null, renderPreview()));
     el.querySelectorAll("[data-cell]").forEach((c) => c.onclick = () => (ui.selCell = c.dataset.cell, renderPreview()));
+    el.querySelectorAll("[data-pref]").forEach((b) => b.onclick = () => {
+      const pc = pageCfg(b.dataset.pid);
+      if (!pc) return;
+      pc.keyPrefs = pc.keyPrefs || {};
+      if (b.dataset.val) pc.keyPrefs[b.dataset.pref] = b.dataset.val;
+      else delete pc.keyPrefs[b.dataset.pref];
+      save();
+      renderPreview();
+    });
+    el.querySelectorAll("[data-listenc]").forEach((cb) => cb.onchange = () => {
+      const pc = pageCfg(cb.dataset.listenc);
+      if (pc) (pc.listEncoder = cb.checked, save(), renderPreview());
+    });
+    el.querySelectorAll("[data-prefreset]").forEach((b) => b.onclick = () => {
+      const pc = pageCfg(b.dataset.prefreset);
+      if (pc) (pc.keyPrefs = {}, save(), renderPreview());
+    });
+  }
+  function pageCfg(id) {
+    for (const d of P().decks) for (const pg of d.pages) if (pg.id === id) return pg;
+    return null;
   }
   function reportHtml(pg, deck) {
     const r = pg.report;
     const li = [];
     if (r.warning) li.push(`<li class="warn">${esc(r.warning)}</li>`);
-    if (r.dropped.length) li.push(`<li class="warn">Kein Platz für: ${esc(r.dropped.map((x) => displayText(x.btn).replace(/\n/g, " ")).join(", "))}</li>`);
+    const pgCfg = pageCfg(pg.pageId);
+    const prefs = pgCfg?.keyPrefs || {};
+    const chip = (x, act, label) => `<button class="btn" style="padding:2px 8px;font-size:12px" data-pref="${esc(itemKey(x))}" data-val="${act}" data-pid="${pg.pageId}">${label}</button>`;
+    if (r.onEncoder?.length) li.push(`<li><b>Auf dem Drehregler zum Blättern</b> (drehen = auswählen, drücken = auslösen):<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${r.onEncoder.map((x) => `<span class="pill" style="display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line,#444);border-radius:8px;padding:3px 6px">${esc(plainLabel(x.btn))} ${chip(x, "show", "als Taste")}${prefs[itemKey(x)] === "hide" ? chip(x, "", "zurück") : ""}</span>`).join("")}</div></li>`);
+    if (r.dropped.length) li.push(`<li class="warn">Kein Platz für: <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${r.dropped.map((x) => `<span style="display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line,#444);border-radius:8px;padding:3px 6px">${esc(plainLabel(x.btn))} ${chip(x, "show", "statt einer anderen Taste zeigen")}</span>`).join("")}</div>${deck.encoders.length ? "" : "<small>Dieses Deck hat keine Drehregler – eine weitere Seite oder ein größeres Deck schafft Platz.</small>"}</li>`);
+    if (pgCfg && deck.encoders.length) li.push(`<li><label class="f check" style="margin:0"><input type="checkbox" data-listenc="${pg.pageId}" ${pgCfg.listEncoder !== false ? "checked" : ""}> Tasten ohne Platz automatisch auf einen freien Drehregler legen</label></li>`);
+    if (Object.keys(prefs).length) li.push(`<li><button class="btn" style="padding:2px 8px;font-size:12px" data-prefreset="${pg.pageId}">Meine Platzierungen für diese Seite zurücksetzen</button></li>`);
     if (r.droppedEncoders.length && deck.encoders.length) li.push(`<li class="warn">Regler ohne Platz: ${esc(r.droppedEncoders.map((e) => e.name || displayText(e).split("\n")[0]).join(", "))}</li>`);
     if (r.droppedEncoders.length && !deck.encoders.length) li.push(`<li>Dieses Deck hat keine Drehregler – Regler-Funktionen ${P().encodersAsKeys ? "wurden (wo sinnvoll) als −/+ Tasten angelegt" : "entfallen"}.</li>`);
     return li.length ? `<ul class="report">${li.join("")}</ul>` : "";
@@ -2557,7 +2659,11 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
     const devLabels = Object.fromEntries(P().devices.map((d) => [d.id, cleanLabel(d.label)]));
     const list = (arr) => arr && arr.length ? `<pre>${esc(arr.map((e) => describeEntity(e, devLabels)).join(""))}</pre>` : "<pre>–</pre>";
     const kindName = { key: "Taste", lcd: "LCD-Feld (Touch)", encoder: "Drehregler", nav: "Navigation" }[meta.kind] || meta.kind;
-    return `<h3>${esc(kindName)}</h3>
+    const pg = ui._pg;
+    const hasEnc = pg && DECKS[P().decks[pg.deckIdx].deckType].encoders.length;
+    const prefBtns = meta.kind === "key" && meta.itemKey && pg ? `<div class="row" style="gap:6px;margin:6px 0">${hasEnc ? `<button class="btn" data-pref="${esc(meta.itemKey)}" data-val="hide" data-pid="${pg.pageId}">Auf Blätter-Regler legen</button>` : ""}${meta.pref ? `<button class="btn" data-pref="${esc(meta.itemKey)}" data-val="" data-pid="${pg.pageId}">Automatisch platzieren</button>` : ""}${meta.pref !== "show" ? `<button class="btn" data-pref="${esc(meta.itemKey)}" data-val="show" data-pid="${pg.pageId}">Immer als Taste zeigen</button>` : ""}</div>` : "";
+    const listInfo = meta.isList ? `<p class="hint"><b>Blätter-Regler:</b> ${esc((meta.listItems || []).join(" · "))}</p>` : "";
+    return `<h3>${esc(kindName)}</h3>${prefBtns}${listInfo}
     ${meta.info ? `<p class="hint">${esc(meta.info)}</p>` : ""}
     <h4>Text</h4><pre>${esc(String(meta.text).replace(/\\n/g, "\n"))}${meta.textExpression ? "\n(Expression)" : ""}</pre>
     ${meta.kind === "encoder" ? `<h4>Links drehen</h4>${list(meta.left)}<h4>Rechts drehen</h4>${list(meta.right)}<h4>Drücken</h4>${list(meta.down)}` : `<h4>Drücken</h4>${list(meta.down)}${meta.up?.length ? `<h4>Loslassen</h4>${list(meta.up)}` : ""}`}
@@ -2576,6 +2682,7 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
       <div class="row">
         <button class="btn primary" id="expFull" ${pages.length ? "" : "disabled"}>⬇ ${esc(cleanLabel(p.name))}.companionconfig</button>
       </div>
+      <p class="hint">Am iPad öffnet sich das Teilen-Menü: „In Dateien sichern“ wählen. Die Datei endet auf <b>.companionconfig</b> – ist sie in Companion trotzdem ausgegraut, in der Dateien-App den Namen prüfen (kein „.json“ am Ende).</p>
       <p class="hint">In Companion: <b>Import / Export → Import</b> → Datei wählen → „Full Import“. Bei <b>Buttons</b> und <b>Custom Variables</b> „Reset and Import“ wählen, <b>Connections</b> auf „Unchanged“ lassen, damit bestehende Verbindungen mit gleichem Namen weiterverwendet werden. Achtung: Reset ersetzt alle Tasten der Companion-Installation.</p>
     </div>
     <div class="card">
