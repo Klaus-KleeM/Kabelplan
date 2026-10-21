@@ -2696,8 +2696,9 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
     <div class="card">
       <h2>Komplette Konfiguration</h2>
       <p>Alle ${pages.length} Seiten, ${used.length} Verbindung(en)${p.decks.some((d) => d.pages.some((x) => x.template === "ptz")) ? " und die PTZ-Custom-Variables" : ""} in einer Datei.</p>
-      <div class="row">
-        <button class="btn primary" id="expFull" ${pages.length ? "" : "disabled"}>⬇ ${esc(cleanLabel(p.name))}.companionconfig</button>
+      <div class="row" style="align-items:end">
+        <label class="f" style="flex:1;min-width:200px">Dateiname<input id="expName" value="${esc(p.exportName || p.name)}" autocapitalize="off" spellcheck="false"></label>
+        <button class="btn primary" id="expFull" ${pages.length ? "" : "disabled"}>⬇ <span id="expFn">${esc(cleanLabel(p.exportName || p.name))}</span>.companionconfig</button>
       </div>
       <p class="hint">Am iPad öffnet sich das Teilen-Menü: „In Dateien sichern“ wählen. Die Datei endet auf <b>.companionconfig</b> – ist sie in Companion trotzdem ausgegraut, in der Dateien-App den Namen prüfen (kein „.json“ am Ende).</p>
       <p class="hint">In Companion: <b>Import / Export → Import</b> → Datei wählen → „Full Import“. Bei <b>Buttons</b> und <b>Custom Variables</b> „Reset and Import“ wählen, <b>Connections</b> auf „Unchanged“ lassen, damit bestehende Verbindungen mit gleichem Namen weiterverwendet werden. Achtung: Reset ersetzt alle Tasten der Companion-Installation.</p>
@@ -2715,8 +2716,10 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
       <ul>${[...new Set(used.map((d) => d.type))].map((t) => `<li><code>${DEVICE_TYPES[t].moduleId}</code> – geprüft mit v${DEVICE_TYPES[t].moduleVersion}</li>`).join("") || '<li class="muted">–</li>'}</ul>
       <p class="hint">Erfordert Companion 4.3 oder neuer (Exportformat v12). Companion 4.0–4.2 lehnt die Datei als „zu neu“ ab.</p>
     </div>`;
-    $("#expFull")?.addEventListener("click", () => download(`${cleanLabel(p.name)}.companionconfig`, exportFull(p)));
-    el.querySelectorAll("[data-page]").forEach((b) => b.onclick = () => download(`${cleanLabel(p.name)}_seite${b.dataset.page}.companionconfig`, exportSinglePage(p, Number(b.dataset.page))));
+    const fn = () => cleanLabel(p.exportName || p.name);
+    $("#expName").oninput = (e) => (p.exportName = e.target.value.trim(), save(), $("#expFn").textContent = fn());
+    $("#expFull")?.addEventListener("click", () => download(`${fn()}.companionconfig`, exportFull(p)));
+    el.querySelectorAll("[data-page]").forEach((b) => b.onclick = () => download(`${fn()}_seite${b.dataset.page}.companionconfig`, exportSinglePage(p, Number(b.dataset.page))));
     $("#optEnc").onchange = (e) => (p.encodersAsKeys = e.target.checked, save(), renderExport());
     $("#optPin").onchange = (e) => (p.pinModuleVersions = e.target.checked, save());
   }
