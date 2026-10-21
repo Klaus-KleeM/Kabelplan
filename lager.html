@@ -81,6 +81,7 @@ button.add{font:inherit;font-weight:700;border:0;background:var(--acc);color:#ff
     <button data-v="jobs" class="on">Jobs</button>
     <button data-v="articles">Artikel</button>
     <button data-v="stock">Lagerstand</button>
+    <button data-v="todo">Todo <span id="todo-n" class="pill w" style="display:none"></span></button>
     <button data-v="data">Daten</button>
   </nav>
 </header>
@@ -183,6 +184,7 @@ button.add{font:inherit;font-weight:700;border:0;background:var(--acc);color:#ff
       <label style="flex:0 1 140px">Wiederbeschaffung/Stk<input type="number" step="0.01" id="af-value" value="0" inputmode="decimal"></label>
     </div>
     <div class="row" style="margin-top:8px">
+      <label style="flex:0 1 auto;flex-direction:row;align-items:center;gap:6px;color:var(--fg)"><input type="checkbox" id="af-kpsync"> im Kabelplan als Gerät</label>
       <label style="flex:3 1 260px">Kabelplan-Gerät <span class="mut" id="af-kp-hint"></span><input id="af-kp" list="kp-dl" placeholder="Leer = kein Gerät im Kabelplan (z. B. Kabel, Zubehör)"></label>
     </div>
     <datalist id="kp-dl"></datalist>
@@ -257,6 +259,17 @@ button.add{font:inherit;font-weight:700;border:0;background:var(--acc);color:#ff
   </table></div></div>
 </section>
 
+<!-- TODO -->
+<section id="v-todo" class="hide">
+  <div class="card">
+    <div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">Offene Punkte</h2>
+      <div class="chips" style="margin:0"><button class="chip on" id="tf-all" onclick="todoFilter('')">Alle</button><button class="chip" id="tf-lager" onclick="todoFilter('lager')">Lager</button><button class="chip" id="tf-kabelplan" onclick="todoFilter('kabelplan')">Kabelplan</button></div></div>
+    <p class="mut">Entstehen, wenn Lager und Kabelplan Geräte füreinander anlegen und dabei etwas fehlt (Preis, Eigentum, Anschlüsse). Abhaken, wenn erledigt – Preis-Punkte haken sich selbst ab, sobald ein Preis eingetragen ist.</p>
+    <div id="todo-list"></div>
+    <details style="margin-top:10px"><summary class="mut" id="todo-done-sum">Erledigt</summary><div id="todo-done"></div></details>
+  </div>
+</section>
+
 <!-- DATEN -->
 <section id="v-data" class="hide">
   <div class="card">
@@ -271,7 +284,8 @@ button.add{font:inherit;font-weight:700;border:0;background:var(--acc);color:#ff
     <p class="mut">Lager und Kabelplan teilen sich die Daten auf diesem iPad: Jobs erscheinen im Kabelplan unter Pläne → „Aus Lager übernehmen“, Packlisten hier im Job unter „Packliste aus Kabelplan“. Die Geräteliste kommt automatisch aus dem Kabelplan.</p>
     <div class="row"><span class="mut" id="kp-status"></span><span style="flex:1"></span>
       <label class="b">Geräteliste aus Datei laden<input type="file" accept=".csv,.json,.txt" class="hide" onchange="kpUpload(this)"></label>
-      <button class="b" onclick="exportKpInventory()">Lagerstand für Kabelplan (Datei)</button></div>
+      <button class="b" onclick="exportKpInventory()">Lagerstand für Kabelplan (Datei)</button>
+      <button class="b" onclick="kpQueueAll()">Fehlende Geräte im Kabelplan anlegen</button></div>
   </div>
   <div class="card">
     <h2>Speicher</h2>
@@ -292,6 +306,23 @@ const KP_SEED=[{"id":"lib-kairos-core-200-at-kc200","mfr":"Panasonic","name":"Ka
 const DBNAME='kleem-lager', LSKEY='kleem-lager-state-v1';
 const K_LAGER_BRIDGE='kleem.lager.export.v1', K_KP_LIB='kleem.kabelplan.library.v1', K_KP_PACK='kleem.kabelplan.packlisten.v1';
 const MAX_LINK_DEPTH=5;
+/* ---------- Gemeinsame Todo-Liste (Lager + Kabelplan, gleicher Speicher am iPad) ---------- */
+const K_TODO='kleem.todos.v1', K_KPNEW='kleem.lager.kpnew.v1';
+function todosLoad(){try{const l=JSON.parse(localStorage.getItem(K_TODO)||'[]');return Array.isArray(l)?l:[];}catch(e){return[];}}
+function todosSave(l){try{localStorage.setItem(K_TODO,JSON.stringify(l));}catch(e){}}
+function todoAdd(t){const l=todosLoad();if(l.some(x=>x.key===t.key&&!x.done))return false;
+  l.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),created:new Date().toISOString(),done:false,...t});todosSave(l);return true;}
+function todoDone(key){const l=todosLoad();let ch=false;l.forEach(x=>{if(x.key===key&&!x.done){x.done=true;x.doneAt=new Date().toISOString();x.auto=true;ch=true;}});if(ch)todosSave(l);}
+function todoOpenCount(){return todosLoad().filter(x=>!x.done).length;}
+// Lager-Gruppe -> Kabelplan-Gruppe und zurück
+const SUB2KP={'Kameras':'Kamera','Bildmischer & Regie':'Bildmischer','Kreuzschienen':'Kreuzschiene','Konverter & Encoder':'Interface','Monitore':'Monitor','Projektion':'Projektor',
+  'Mischpulte':'Audio','Lautsprecher':'Lautsprecher','Mikrofone':'Audio','DI & Interfaces':'Audio','Scheinwerfer':'Sonstiges','DMX & Steuerung':'Steuerung','Rechner':'Computer',
+  'Steuerung':'Steuerung','Switches & Funk':'Netzwerk','Zuspieler':'Zuspieler','Medienserver':'Medienserver','LED':'LED-Prozessor','Stageboxen':'Stagebox','Takt':'Takt','Audio':'Audio'};
+const KP2CAT={'Kamera':['Video','Kameras'],'Bildmischer':['Video','Bildmischer & Regie'],'Kreuzschiene':['Video','Kreuzschienen'],'Interface':['Video','Konverter & Encoder'],
+  'Monitor':['Video','Monitore'],'Projektor':['Video','Projektion'],'LED-Prozessor':['Video','LED'],'Medienserver':['Video','Medienserver'],'Zuspieler':['Video','Zuspieler'],
+  'Takt':['Video','Takt'],'Audio':['Ton','Audio'],'Lautsprecher':['Ton','Lautsprecher'],'Stagebox':['Ton','Stageboxen'],'Computer':['IT','Rechner'],'Steuerung':['IT','Steuerung'],
+  'Netzwerk':['Netzwerk','Switches & Funk'],'Sonstiges':['Sonstiges','']};
+const slugKp=s=>'lib-lager-'+String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,60);
 let S=null;
 function blank(){return{v:1,seq:{a:0,u:0,l:0,j:0,p:0},articles:[],units:[],links:[],jobs:[],positions:[],kp_map:{},kp_devices:[],importMaps:{},lastBackup:null};}
 function idb(){return new Promise((res,rej)=>{if(!('indexedDB' in window))return rej('no idb');const r=indexedDB.open(DBNAME,1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
@@ -323,11 +354,23 @@ function listArticles(){
   return S.articles.slice().sort((a,b)=>(a.category||'').localeCompare(b.category||'','de')||(a.subcategory||'').localeCompare(b.subcategory||'','de')||a.name.localeCompare(b.name,'de',{numeric:true}))
     .map(a=>({...a,link_count:cnt[a.id]||0,unit_count:ucnt[a.id]||0}));
 }
-function articleFields(b){return{owned:b.owned!==false&&b.owned!=='false',name:String(b.name||'').trim(),category:String(b.category||'').trim(),subcategory:String(b.subcategory||'').trim(),stock:parseInt(b.stock)||0,price:+b.price||0,notes:b.notes||'',
+function articleFields(b){return{...(b.kp_sync!=null?{kp_sync:!!b.kp_sync}:{}),owned:b.owned!==false&&b.owned!=='false',name:String(b.name||'').trim(),category:String(b.category||'').trim(),subcategory:String(b.subcategory||'').trim(),stock:parseInt(b.stock)||0,price:+b.price||0,notes:b.notes||'',
   manufacturer:b.manufacturer||'',inv_no:b.inv_no||'',purchase_date:b.purchase_date||null,value:+b.value||0,kabelplan_id:String(b.kabelplan_id||'').trim()};}
 const casesOf=aid=>S.links.filter(l=>l.kind==='verbaut'&&l.child_id===aid).map(l=>art(l.parent_id)).filter(Boolean);
 const contentsOf=aid=>S.links.filter(l=>l.parent_id===aid).map(l=>({id:l.child_id,name:(art(l.child_id)||{}).name||'?',qty:l.qty,kind:l.kind,included:l.included})).sort((a,b)=>(a.kind>b.kind?-1:a.kind<b.kind?1:0)||a.name.localeCompare(b.name,'de'));
 const isOwn=a=>!!a&&a.owned!==false;
+const isKpDevice=a=>a.kp_sync!=null?!!a.kp_sync:!!SUB2KP[a.subcategory];
+// Artikel ohne Kabelplan-Gerät: im Kabelplan als Gerät anlegen lassen (ohne Anschlüsse) + Todo
+function queueKpDevice(a){if(a.kabelplan_id||!isKpDevice(a))return false;
+  const devs=kpDevices().list;const hit=matchKp(devs,a.manufacturer||'',a.name);if(hit){a.kabelplan_id=hit.id;return false;}
+  const known=new Set(devs.map(d=>d.id));
+  const id=slugKp((a.manufacturer&&!norm(a.name).startsWith(norm(a.manufacturer))?a.manufacturer+' ':'')+a.name);a.kabelplan_id=id;if(known.has(id))return false;
+  let q=[];try{q=JSON.parse(localStorage.getItem(K_KPNEW)||'[]');}catch(e){}
+  if(!q.some(x=>x.id===id))q.push({id,name:a.name,mfr:a.manufacturer||'',grp:SUB2KP[a.subcategory]||'Sonstiges',qty:isOwn(a)?a.stock:0,from:'lager',at:new Date().toISOString()});
+  try{localStorage.setItem(K_KPNEW,JSON.stringify(q));}catch(e){}
+  todoAdd({app:'kabelplan',kind:'ports',key:'kp:ports:'+id,ref:id,title:`Anschlüsse eintragen: ${a.name}`,text:'Aus dem Lager im Kabelplan angelegt – ohne Anschlüsse. In der Bibliothek Ein-/Ausgänge ergänzen.'});
+  return true;}
+function queueAllKp(){let n=0;S.articles.forEach(a=>{if(queueKpDevice(a))n++;});return n;}
 function syncStock(aid){const n=S.units.filter(u=>u.article_id===aid).length;if(n)art(aid).stock=n;}
 function cycle(parent,child){const stack=[child],seen=new Set();while(stack.length){const c=stack.pop();if(c===parent)return true;if(seen.has(c))continue;seen.add(c);S.links.filter(l=>l.parent_id===c).forEach(l=>stack.push(l.child_id));}return false;}
 
@@ -391,7 +434,7 @@ function lagerJobExport(jid){
   const job=jobBy(jid)||err(404,'Job nicht gefunden');const ps=positionsOf(job);const pos=[];
   ps.forEach(p=>{const a=art(p.article_id);const isCase=a&&S.links.some(l=>l.parent_id===a.id&&l.kind==='verbaut');
     let typ=!a?((p.kp_id||p.rent)?'artikel':'frei'):isCase?'case':((p.depth===0||p.link_kind==='verbaut')?'artikel':'zubehoer');if(p.source==='kabelplan'&&typ!=='artikel')return;
-    pos.push({typ,kabelplan_id:(a&&a.kabelplan_id)||p.kp_id||'',hersteller:(a&&a.manufacturer)||'',bezeichnung:p.name.replace(/^Zumiete: /,''),kategorie:(a&&a.category)||'',menge:p.qty,zumiete:!!p.rent});});
+    pos.push({typ,kabelplan_id:(a&&a.kabelplan_id)||p.kp_id||'',hersteller:(a&&a.manufacturer)||'',bezeichnung:p.name.replace(/^Zumiete: /,''),kategorie:(a&&a.category)||'',untergruppe:(a&&a.subcategory)||'',menge:p.qty,zumiete:!!p.rent});});
   return{kind:'kleem-lager-job',v:1,job:{id:job.id,name:job.name,kunde:job.customer,von:job.start_date,bis:job.end_date,ort:job.location},
     positionen:pos,inventar:Object.entries(availForJob(job)).map(([k,v])=>({kabelplan_id:k,bestand:v}))};
 }
@@ -424,6 +467,31 @@ function packPreview(jid,d){
   (d.cases||[]).forEach(x=>{const label='Case: '+x.bezeichnung+(x.typ?` (${x.typ})`:'');const a=matchArticle(x.typ||'');
     lines.push({kind:'case',label,qty:1,booked:0,mode:a?'article':'skip',article_id:a?a.id:null,article_name:a?a.name:''});});
   return{plan:d.plan||{},lines};
+}
+// Automatisch: fehlende Artikel anlegen (Geräte als Zumiete), offene Punkte als Todo
+function packAuto(jid,d){
+  const pv=packPreview(jid,d);const devs=kpDevices().list;const created=[];
+  const mk=(f,todo)=>{const a={id:nid('a'),...articleFields(f)};S.articles.push(a);created.push(a.name);todoAdd({app:'lager',ref:a.id,...todo(a)});return a;};
+  pv.lines.forEach(l=>{
+    if(l.kind==='zumiete'&&l.mode!=='skip'){const own=S.articles.find(x=>isOwn(x)&&l.kp_id&&x.kabelplan_id===l.kp_id);if(own&&l.mode==='free'){l.mode='article';l.article_id=own.id;}}
+    if(l.mode!=='free')return;
+    const name=l.label.replace(/^(Zumiete|Software|Case): /,'');
+    if(l.kind==='geraet'||l.kind==='zumiete'){
+      const g=(d.geraete||[]).find(x=>x.kabelplan_id===l.kp_id)||{};const dv=devs.find(x=>x.id===(l.kp_id||g.kabelplan_id))||{};const [cat,sub]=KP2CAT[dv.grp]||['Sonstiges',''];
+      const a=mk({name:g.bezeichnung||name,manufacturer:g.hersteller||dv.mfr||'',category:cat,subcategory:sub,owned:false,stock:0,price:0,kabelplan_id:l.kp_id||g.kabelplan_id||''},
+        a=>({kind:'price',key:'lager:price:'+a.id,title:`Preis und Eigentum prüfen: ${a.name}`,text:'Aus dem Kabelplan als Zumiete angelegt. Mietpreis eintragen. Gehört dir das Gerät? Dann Eigentum auf „Gehört mir“ und Bestand eintragen.'}));
+      l.mode='article';l.article_id=a.id;}
+    else if(l.kind==='kabel'||l.kind==='zubehoer'){
+      const a=mk({name,category:l.kind==='kabel'?'Kabel':'Zubehör',subcategory:l.kind==='kabel'?(name.split(/[ ·]/)[0]||''):'',owned:false,stock:0,price:0},
+        a=>({kind:'price',key:'lager:price:'+a.id,title:`Preis und Eigentum prüfen: ${a.name}`,text:'Aus der Kabelplan-Packliste als Zumiete angelegt. Gehört es dir? Dann Eigentum auf „Gehört mir“ und Bestand eintragen. Mietpreis eintragen.'}));
+      l.mode='article';l.article_id=a.id;}
+    else if(l.kind==='software'){
+      const a=mk({name,category:'Software',subcategory:'',owned:false,stock:0,price:0},
+        a=>({kind:'price',key:'lager:price:'+a.id,title:`Lizenzpreis eintragen: ${a.name}`,text:'Aus dem Kabelplan angelegt (Software auf Rechnern im Plan).'}));
+      l.mode='article';l.article_id=a.id;}
+  });
+  const r=packApply(jid,pv.lines.map(l=>({...l,remember:true})));
+  return{...r,created};
 }
 function packApply(jid,lines){
   jobBy(jid)||err(404,'Job nicht gefunden');
@@ -511,6 +579,7 @@ function importRows(rows,opt){
           value:r.value!=null&&String(r.value).trim()!==''?numv(r.value):null,notes:sn?'':String(r.notes??'').trim()});res.units++;if(sn)have.add(sn);}});
       syncStock(a.id);}
     else if(!S.units.some(u=>u.article_id===a.id))a.stock=stock;});
+  if(opt.kpSync)res.kp=queueAllKp();
   const seen={};groups.forEach(g=>{const k=norm(g.rows[0].name);if(seen[k]&&!res.dups.includes(g.rows[0].name))res.dups.push(g.rows[0].name);seen[k]=1;});
   return res;
 }
@@ -520,7 +589,8 @@ function importRows(rows,opt){
    ========================================================================= */
 const routes=[
  ['GET',/^\/articles$/,()=>listArticles()],
- ['POST',/^\/articles$/,(m,b)=>{const a={id:nid('a'),...articleFields(b)};S.articles.push(a);return{id:a.id};}],
+ ['POST',/^\/articles$/,(m,b)=>{const a={id:nid('a'),...articleFields(b)};S.articles.push(a);queueKpDevice(a);return{id:a.id};}],
+ ['POST',/^\/kabelplan\/queue-all$/,()=>({n:queueAllKp()})],
  ['PUT',/^\/articles\/(\d+)$/,(m,b)=>{const a=art(+m[1])||err(404,'Artikel nicht gefunden');Object.assign(a,articleFields(b));syncStock(a.id);return{ok:true};}],
  ['DELETE',/^\/articles\/(\d+)$/,m=>{const id=+m[1];S.articles=S.articles.filter(a=>a.id!==id);S.units=S.units.filter(u=>u.article_id!==id);S.links=S.links.filter(l=>l.parent_id!==id&&l.child_id!==id);
    S.positions.forEach(p=>{if(p.article_id===id)p.article_id=null;});Object.keys(S.kp_map).forEach(k=>{if(S.kp_map[k]===id)delete S.kp_map[k];});return{ok:true};}],
@@ -578,6 +648,7 @@ const routes=[
    S.articles.filter(a=>!a.kabelplan_id).forEach(a=>{const d=matchKp(devs,a.manufacturer||'',a.name);if(d){a.kabelplan_id=d.id;done.push({article:a.name,kabelplan:d.label});}else open.push(a.name);});return{mapped:done,unmapped:open};}],
  ['GET',/^\/jobs\/(\d+)\/kabelplan\.json$/,m=>lagerJobExport(+m[1])],
  ['POST',/^\/jobs\/(\d+)\/packliste\/preview$/,(m,b)=>packPreview(+m[1],b.packliste)],
+ ['POST',/^\/jobs\/(\d+)\/packliste\/auto$/,(m,b)=>packAuto(+m[1],b.packliste)],
  ['POST',/^\/jobs\/(\d+)\/packliste\/apply$/,(m,b)=>packApply(+m[1],b.lines||[])],
 ];
 async function api(path,method='GET',body){
@@ -612,7 +683,8 @@ const safeName=s=>(String(s||'').replace(/[^\wäöüÄÖÜß \-]/g,'').trim()||'
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => show(b.dataset.v));
 function show(v){
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.v===v));
-  ['jobs','articles','stock','data'].forEach(x => $('v-'+x).classList.toggle('hide', x!==v));
+  ['jobs','articles','stock','data','todo'].forEach(x => $('v-'+x).classList.toggle('hide', x!==v));
+  if (v==='todo') renderTodos();
   if (v==='jobs') JOB ? openJob(JOB.id) : loadJobs();
   if (v==='articles') loadArticles();
   if (v==='stock') loadStock();
@@ -655,7 +727,7 @@ function findArt(name){name=name.trim().toLowerCase();if(!name)return null;retur
 function resetArticleForm(){
   EDIT_ART = null;
   ['name','category','subcategory','notes','manufacturer','inv_no','purchase_date','kp'].forEach(k => $('af-'+k).value=''); $('af-kp-hint').textContent='';
-  $('af-stock').value=1; $('af-price').value=0; $('af-value').value=0; $('af-stock').disabled=false; $('af-owned').value='1';
+  $('af-stock').value=1; $('af-price').value=0; $('af-value').value=0; $('af-stock').disabled=false; $('af-owned').value='1'; $('af-kpsync').checked=false; $('af-kpsync').dataset.touched='';
   $('units-box').classList.add('hide'); $('af-title').textContent='Neuer Artikel';
   $('af-cancel').classList.add('hide'); $('links-box').classList.add('hide');
 }
@@ -663,7 +735,7 @@ async function editArticle(id){
   const a = ARTS.find(x => x.id===id); EDIT_ART = a;
   ['name','category','subcategory','stock','price','notes','manufacturer','inv_no','purchase_date','value'].forEach(k => $('af-'+k).value = a[k] ?? '');
   $('af-kp').value = kpLabel(a.kabelplan_id) || a.kabelplan_id || ''; $('af-kp-hint').textContent = a.kabelplan_id ? '('+a.kabelplan_id+')' : '';
-  $('af-owned').value = a.owned===false?'0':'1';
+  $('af-owned').value = a.owned===false?'0':'1'; $('af-kpsync').checked = isKpDevice(a); $('af-kpsync').dataset.touched='';
   $('af-stock').disabled = !!a.unit_count || a.owned===false; $('units-box').classList.remove('hide'); loadUnits();
   $('af-title').textContent='Artikel bearbeiten';
   $('af-cancel').classList.remove('hide'); $('links-box').classList.remove('hide');
@@ -678,7 +750,8 @@ async function saveArticle(){
   if (!b.name) return toast('Bezeichnung fehlt');
   const kp = kpIdFrom($('af-kp').value); if (kp===null) return toast('Kabelplan-Gerät nicht gefunden – aus der Liste wählen oder leer lassen');
   b.kabelplan_id = kp;
-  if (EDIT_ART){await api('/articles/'+EDIT_ART.id,'PUT',b); toast('Gespeichert')}
+  if($('af-kpsync').dataset.touched||EDIT_ART)b.kp_sync=$('af-kpsync').checked;
+  if (EDIT_ART){await api('/articles/'+EDIT_ART.id,'PUT',b); const a=art(EDIT_ART.id); if(a&&queueKpDevice(a)){persist();toast('Gespeichert – Gerät wird im Kabelplan angelegt');} else toast('Gespeichert')}
   else {const r = await api('/articles','POST',b); toast('Angelegt'); await loadArticles(); return editArticle(r.id)}
   await loadArticles();
 }
@@ -704,6 +777,8 @@ async function addUnit(){
 async function delUnit(id){if(!confirm('Gerät entfernen?'))return; await api('/units/'+id,'DELETE'); await refreshArt()}
 async function refreshArt(){const id=EDIT_ART.id; await loadArticles(); editArticle(id)}
 $('un-serial').addEventListener('keydown', e => e.key==='Enter' && addUnit());
+$('af-kpsync').addEventListener('change', e => e.target.dataset.touched='1');
+$('af-subcategory').addEventListener('change', () => { if(!$('af-kpsync').dataset.touched) $('af-kpsync').checked = !!SUB2KP[$('af-subcategory').value.trim()]; });
 async function loadLinks(){
   const ls = await api(`/articles/${EDIT_ART.id}/links`);
   const kindLbl = k => k==='verbaut' ? '<span class="pill">im Case verbaut</span>' : '<span class="pill">Zubehör</span>';
@@ -776,6 +851,7 @@ function impRender(){
     <label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="im-merge" ${hasSer?'checked':''}> Zeilen mit gleicher Bezeichnung zu einem Artikel zusammenfassen (jede Seriennummer wird ein Einzelgerät)</label>
     <label style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="im-upd" checked> Vorhandene Artikel (gleiche Bezeichnung oder Inv.-Nr.) aktualisieren statt doppelt anlegen</label>
     <label style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="im-keep"> Bei vorhandenen Artikeln meine Preise behalten</label>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="im-kp" checked> Geräte (Kameras, Mischer, Monitore, Rechner …), die der Kabelplan noch nicht kennt, dort anlegen – fehlende Anschlüsse kommen als Todo</label>
     <label style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="im-brand" checked> Fehlenden Hersteller aus dem Namen ergänzen (z. B. „Aputure LS 300X“ → Aputure)</label>
     <label style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="im-group" ${IMP.map.category>=0?'':'checked'}> Fehlende Gruppe/Untergruppe vorschlagen (Video, Ton, Licht …) – danach in der Artikelliste korrigierbar</label>
     <h2 style="margin-top:12px">Vorschau</h2>
@@ -784,12 +860,12 @@ function impRender(){
     <div class="row" style="margin-top:10px"><button class="b" onclick="closeModal()">Abbrechen</button><span style="flex:1"></span><button class="b p" id="im-go">${rows.length} Zeilen importieren</button></div>`);
   if($('im-sheet'))$('im-sheet').onchange=e=>impSheet(+e.target.value);
   document.querySelectorAll('#modal select[data-k]').forEach(sel=>sel.onchange=()=>{const v=+sel.value;Object.keys(IMP.map).forEach(k=>{if(IMP.map[k]===v&&v>=0)IMP.map[k]=-1;});IMP.map[sel.dataset.k]=v;
-    const ids=['im-merge','im-upd','im-keep','im-brand','im-group'],keep=ids.map(i=>$(i).checked);impRender();ids.forEach((i,j)=>$(i).checked=keep[j]);});
+    const ids=['im-merge','im-upd','im-keep','im-brand','im-group','im-kp'],keep=ids.map(i=>$(i).checked);impRender();ids.forEach((i,j)=>$(i).checked=keep[j]);});
   $('im-go').onclick=async()=>{if(!(IMP.map.name>=0))return toast('Bitte die Spalte für die Bezeichnung wählen');
     S.importMaps[IMP.sig]={...IMP.map};
-    const r=await api('/articles/import2','POST',{rows:impRows(),merge:$('im-merge').checked,update:$('im-upd').checked,keepPrice:$('im-keep').checked,guessBrand:$('im-brand').checked,guessGroup:$('im-group').checked});
+    const r=await api('/articles/import2','POST',{rows:impRows(),merge:$('im-merge').checked,update:$('im-upd').checked,keepPrice:$('im-keep').checked,guessBrand:$('im-brand').checked,guessGroup:$('im-group').checked,kpSync:$('im-kp').checked});
     closeModal();await loadArticles();
-    modal(`<h2>Import fertig</h2><p><b>${r.created}</b> Artikel neu, <b>${r.updated}</b> aktualisiert${r.units?`, <b>${r.units}</b> Einzelgeräte mit Seriennummer`:''}.${r.skipped?` ${r.skipped} Zeilen ohne Bezeichnung übersprungen.`:''}</p>
+    modal(`<h2>Import fertig</h2><p><b>${r.created}</b> Artikel neu, <b>${r.updated}</b> aktualisiert${r.units?`, <b>${r.units}</b> Einzelgeräte mit Seriennummer`:''}.${r.skipped?` ${r.skipped} Zeilen ohne Bezeichnung übersprungen.`:''}${r.kp?` <b>${r.kp}</b> Geräte werden im Kabelplan angelegt (Anschlüsse als Todo).`:''}</p>
       ${r.dups.length?`<p class="warn" style="font-size:14px">Doppelt in der Liste (verschiedene Nummern, gleicher Name) – bitte prüfen: ${r.dups.map(esc).join(', ')}</p>`:''}
       <p class="mut">Nächste Schritte: Gruppen in der Artikelliste prüfen (mehrere auf einmal: „Auswählen“), Preise ergänzen, Cases und Zubehör unter Verknüpfungen anlegen, dann „Kabelplan: automatisch zuordnen“.</p>
       <div class="row"><span style="flex:1"></span><button class="b" onclick="closeModal();kpAutomap()">Kabelplan zuordnen</button><button class="b p" onclick="closeModal()">OK</button></div>`);};
@@ -1023,11 +1099,24 @@ function kpPack(){
       :'<p class="mut">Auf diesem iPad liegt noch kein Plan im Kabelplan. Lege dort einen an oder füge eine Packliste unten ein.</p>'}
     <details style="margin-top:10px" ${pls.length?'':'open'}><summary class="mut">Packliste einfügen oder Datei wählen</summary>
       <textarea id="pk-ta" placeholder="Hier einfügen …"></textarea>
-      <div class="row"><label class="b" style="flex:0 0 auto">Datei wählen<input type="file" accept=".json" class="hide" onchange="pkFile(this)"></label><span style="flex:1"></span><button class="b p" onclick="pkPreview()">Weiter</button></div></details>
+      <div class="row"><label class="b" style="flex:0 0 auto">Datei wählen<input type="file" accept=".json" class="hide" onchange="pkFile(this)"></label><span style="flex:1"></span><button class="b p" onclick="pkChoose()">Weiter</button></div></details>
     <div class="row" style="margin-top:10px"><button class="b" onclick="closeModal()">Abbrechen</button></div>`);
 }
-function pkPick(i){pkPreview(packlistenAusKabelplan()[i]);}
-async function pkFile(inp){$('pk-ta').value=await readFile(inp.files[0]);pkPreview();}
+function pkPick(i){pkChoose(packlistenAusKabelplan()[i]);}
+async function pkFile(inp){$('pk-ta').value=await readFile(inp.files[0]);pkChoose();}
+let PKD=null;
+async function pkChoose(d){
+  if(!d){try{d=JSON.parse($('pk-ta').value)}catch(e){return toast('Kein gültiges JSON')}}PKD=d;
+  const pv=await api(`/jobs/${JOB.id}/packliste/preview`,'POST',{packliste:d});
+  const cnt=k=>pv.lines.filter(l=>l.kind===k||(k==='geraet'&&l.kind==='zumiete')).length;
+  const found=pv.lines.filter(l=>l.mode==='article').length,neu=pv.lines.filter(l=>l.mode==='free'&&l.kind!=='case').length,skip=pv.lines.filter(l=>l.mode==='skip').length;
+  modal(`<h2>Packliste übernehmen${pv.plan&&pv.plan.name?' – '+esc(pv.plan.name):''}</h2>
+    <p>${cnt('geraet')} Geräte, ${cnt('kabel')} Kabelsorten, ${cnt('zubehoer')} Zubehör, ${cnt('software')} Software.</p>
+    <ul><li><b>${found}</b> im Lager gefunden</li><li><b>${neu}</b> nicht im Lager – werden als Zumiet-Artikel angelegt, offene Punkte (Preis, Eigentum) kommen unter <b>Todo</b></li>${skip?`<li>${skip} schon im Job oder Cases (übersprungen)</li>`:''}</ul>
+    <div class="row" style="margin-top:10px"><button class="b" onclick="closeModal()">Abbrechen</button><span style="flex:1"></span><button class="b" onclick="pkPreview(PKD)">Einzeln prüfen</button><button class="b p" onclick="pkAuto()">Automatisch übernehmen</button></div>`);
+}
+async function pkAuto(){const r=await api(`/jobs/${JOB.id}/packliste/auto`,'POST',{packliste:PKD});closeModal();await loadArticles();updTodoBadge();
+  toast(`${r.added} Positionen übernommen${r.created.length?`, ${r.created.length} Artikel neu angelegt – siehe Todo`:''}`);openJob(JOB.id);}
 const KIND={geraet:'Gerät',zumiete:'Zumiete',kabel:'Kabel',zubehoer:'Zubehör',software:'Software',case:'Case'};
 async function pkPreview(d){
   if(!d){try{d=JSON.parse($('pk-ta').value)}catch(e){return toast('Kein gültiges JSON')}}
@@ -1049,7 +1138,29 @@ async function pkApply(){
     lines.push({kind:l.kind,label:l.label,qty:l.qty,booked:l.booked||0,mode,article_id:aid,remember:true,kp_id:l.kp_id||''});}
   const r=await api(`/jobs/${JOB.id}/packliste/apply`,'POST',{lines});closeModal();toast(`${r.added} Positionen übernommen`);openJob(JOB.id);
 }
+async function kpQueueAll(){const r=await api('/kabelplan/queue-all','POST');updTodoBadge();toast(r.n?`${r.n} Geräte werden beim nächsten Öffnen im Kabelplan angelegt – Anschlüsse als Todo`:'Alle Geräte sind im Kabelplan bekannt');loadData();}
 function exportKpInventory(){const b=lagerBridge();saveBlob(new Blob([JSON.stringify({kind:'kleem-lager-inventar',v:1,inventar:b.inventar},null,1)],{type:'application/json'}),'Lagerstand.kabelplan.json');}
+
+// ---- Todo
+let TF='';
+function todoFilter(f){TF=f;['all','lager','kabelplan'].forEach(k=>$('tf-'+k).classList.toggle('on',(f||'all')===k));renderTodos();}
+function todoAutoCheck(){const l=todosLoad();let ch=false;
+  l.forEach(t=>{if(t.done||t.app!=='lager')return;const a=t.ref&&art(+t.ref);
+    if(t.kind==='price'&&a&&a.price>0){t.done=true;t.auto=true;t.doneAt=new Date().toISOString();ch=true;}
+    if(t.kind!=='custom'&&t.ref&&!a&&t.kind!=='info'){t.done=true;t.auto=true;t.doneAt=new Date().toISOString();ch=true;}});
+  if(ch)todosSave(l);updTodoBadge();}
+function updTodoBadge(){const n=todoOpenCount();const b=$('todo-n');if(!b)return;b.textContent=n;b.style.display=n?'inline-block':'none';}
+function renderTodos(){todoAutoCheck();const l=todosLoad().filter(t=>!TF||t.app===TF);
+  const row=t=>`<div class="row" style="align-items:center;padding:8px 0;border-bottom:1px solid var(--line);gap:10px">
+    <input type="checkbox" style="width:22px;height:22px" ${t.done?'checked':''} onchange="todoToggle('${t.id}',this.checked)">
+    <div style="flex:1;min-width:200px"><b>${esc(t.title)}</b>${t.text?`<span class="mut" style="display:block">${esc(t.text)}</span>`:''}
+      <span class="mut" style="font-size:12px">${t.app==='kabelplan'?'Kabelplan':'Lager'} · ${new Date(t.created).toLocaleDateString('de-AT')}${t.done&&t.auto?' · automatisch erledigt':''}</span></div>
+    ${t.app==='lager'&&t.ref?`<button class="b" onclick="todoOpen('${t.id}')">Öffnen</button>`:''}${t.app==='kabelplan'&&t.ref?`<a class="b" style="text-decoration:none" href="index.html#lib=${encodeURIComponent(t.ref)}">Im Kabelplan öffnen</a>`:''}</div>`;
+  const open=l.filter(t=>!t.done),done=l.filter(t=>t.done).slice(-50).reverse();
+  $('todo-list').innerHTML=open.map(row).join('')||'<p class="mut">Nichts offen. 👍</p>';
+  $('todo-done-sum').textContent=`Erledigt (${done.length})`;$('todo-done').innerHTML=done.map(row).join('');updTodoBadge();}
+function todoToggle(id,on){const l=todosLoad();const t=l.find(x=>x.id===id);if(t){t.done=on;t.auto=false;t.doneAt=on?new Date().toISOString():null;todosSave(l);}renderTodos();}
+async function todoOpen(id){const t=todosLoad().find(x=>x.id===id);if(!t)return;show('articles');await loadArticles();if(art(+t.ref))editArticle(+t.ref);}
 
 // ---- Daten
 function backup(){S.lastBackup=new Date().toISOString();persist();
@@ -1072,7 +1183,9 @@ async function loadData(){
   await loadState();
   const today = new Date().toISOString().slice(0,10);$('s-start').value = today; $('s-end').value = today;
   try{localStorage.setItem(K_LAGER_BRIDGE,JSON.stringify(lagerBridge()));}catch(e){}
-  await loadKp(); await loadArticles(); loadJobs();
+  await loadKp(); await loadArticles(); loadJobs(); todoAutoCheck();
+  if(location.hash==='#todo'){history.replaceState(null,'',location.pathname);show('todo');}
+  const mh=location.hash.match(/^#art=(\d+)/);if(mh){history.replaceState(null,'',location.pathname);show('articles');if(art(+mh[1]))editArticle(+mh[1]);}
   if(S.lastBackup&&Date.now()-new Date(S.lastBackup)>14*864e5&&S.jobs.length)toast('Letztes Backup ist über 2 Wochen alt – unter „Daten“ sichern');
   try{if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});}catch(e){}
 })();
