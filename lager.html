@@ -190,6 +190,7 @@ button.add{font:inherit;font-weight:700;border:0;background:var(--acc);color:#ff
       <button class="b hide" id="af-cancel" onclick="resetArticleForm()">Abbrechen</button>
       <span style="flex:1"></span>
       <label class="b" style="flex:0 0 auto">Importieren (Excel/CSV, z. B. EventWorx)<input type="file" accept=".xlsx,.xlsm,.csv,.txt,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hide" onchange="importWizard(this)"></label>
+      <button class="b" onclick="suggestGroups()">Gruppen vorschlagen</button>
       <button class="b" onclick="kpAutomap()">Kabelplan: automatisch zuordnen</button>
     </div>
     <datalist id="cat-dl"></datalist><datalist id="sub-dl"></datalist>
@@ -525,6 +526,8 @@ const routes=[
    const kind=b.kind==='verbaut'?'verbaut':'zubehoer';
    const ex=S.links.find(l=>l.parent_id===p&&l.child_id===c);if(ex){ex.qty=+b.qty||1;ex.included=b.included?1:0;ex.kind=kind;}else S.links.push({id:nid('l'),parent_id:p,child_id:c,qty:+b.qty||1,included:b.included?1:0,kind});return{ok:true};}],
  ['PUT',/^\/links\/(\d+)$/,(m,b)=>{const l=S.links.find(x=>x.id===+m[1])||err(404,'Verknüpfung nicht gefunden');if(b.qty!=null)l.qty=+b.qty||1;if(b.included!=null)l.included=b.included?1:0;if(b.kind)l.kind=b.kind;return{ok:true};}],
+ ['POST',/^\/articles\/suggest-groups$/,()=>{let n=0;S.articles.forEach(a=>{if(a.subcategory)return;const [g,sg]=guessGroup(a.name);if(!g)return;
+   if(!a.category){a.category=g;a.subcategory=sg;n++;}else if(a.category===g&&sg){a.subcategory=sg;n++;}});return{n};}],
  ['POST',/^\/articles\/bulk$/,(m,b)=>{let n=0;(b.ids||[]).forEach(id=>{const a=art(+id);if(!a)return;if(b.category)a.category=b.category;if(b.subcategory!=null&&(b.subcategory||b.category))a.subcategory=b.subcategory;n++;});return{n};}],
  ['POST',/^\/articles\/import2$/,(m,b)=>importRows(b.rows||[],b)],
  ['GET',/^\/jobs\/(\d+)\/catalog$/,m=>{const job=jobBy(+m[1])||err(404,'Job nicht gefunden');const other=bookedElsewhere(job.start_date,job.end_date,job.id);const mine={};
@@ -628,6 +631,8 @@ function selTog(id,on){on?SEL.add(id):SEL.delete(id);renderArticles();selCount()
 function selCount(){if(SEL)$('sel-n').textContent=SEL.size+' gewählt';}
 function filteredArts(){const f=$('a-filter').value.toLowerCase();return ARTS.filter(a=>(a.name+' '+a.category+' '+a.subcategory+' '+(a.manufacturer||'')+' '+(a.inv_no||'')).toLowerCase().includes(f));}
 function selAll(){filteredArts().forEach(a=>SEL.add(a.id));renderArticles();selCount();}
+async function suggestGroups(){const r=await api('/articles/suggest-groups','POST');await loadArticles();
+  toast(r.n?`${r.n} Artikel bekamen Gruppe/Untergruppe – bitte kurz prüfen`:'Alle Artikel haben schon eine Untergruppe (oder kein Vorschlag möglich)');}
 async function bulkSet(){if(!SEL.size)return toast('Nichts gewählt');const c=$('sel-cat').value.trim(),sc=$('sel-sub').value.trim();if(!c&&!sc)return toast('Gruppe oder Untergruppe eintragen');
   const r=await api('/articles/bulk','POST',{ids:[...SEL],category:c,subcategory:sc});toast(r.n+' Artikel geändert');SEL=new Set();await loadArticles();selCount();}
 function findArt(name){name=name.trim().toLowerCase();if(!name)return null;return ARTS.find(a=>a.name.toLowerCase()===name)||ARTS.find(a=>a.name.toLowerCase().includes(name));}
@@ -827,14 +832,19 @@ function renderCatalog(){
   $('cat-chips').querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{CAT={g:b.dataset.g,s:''};renderCatalog();});
   const inG=CATALOG.filter(a=>!CAT.g||(a.category||'Ohne Gruppe')===CAT.g);
   const subs=CAT.g?[...new Set(inG.map(a=>a.subcategory).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'de')):[];
-  $('cat-sub').innerHTML=subs.length?[['','Alle '+CAT.g],...subs.map(x=>[x,x])].map(([v,l])=>`<button class="chip s ${CAT.s===v?'on':''}" data-s="${esc(v)}">${esc(l)}</button>`).join(''):'';
+  const noSub=!CATALOG.some(a=>a.subcategory);
+  $('cat-sub').innerHTML=subs.length?[['','Alle '+CAT.g],...subs.map(x=>[x,x])].map(([v,l])=>`<button class="chip s ${CAT.s===v?'on':''}" data-s="${esc(v)}">${esc(l)}</button>`).join('')
+    :(noSub&&CATALOG.length?`<span class="mut" style="font-size:13px">Noch keine Untergruppen vergeben – unter <b>Artikel → „Gruppen vorschlagen“</b> automatisch zuordnen oder beim Artikel eintragen.</span>`:'');
   $('cat-sub').querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{CAT.s=b.dataset.s;renderCatalog();});
   const list=inG.filter(a=>(!CAT.s||a.subcategory===CAT.s)&&(!q||[a.name,a.manufacturer,a.category,a.subcategory,a.inv_no].join(' ').toLowerCase().includes(q)));
+  let lastH=null;
   $('cat-tb').innerHTML=list.slice(0,300).map(a=>{const nc=a.contents.filter(c=>c.kind==='verbaut').length;
-    return `<tr><td>${esc(a.name)}${a.manufacturer?` <span class="mut">${esc(a.manufacturer)}</span>`:''}
+    const h=CAT.s?null:(CAT.g?(a.subcategory||'ohne Untergruppe'):`${a.category||'Ohne Gruppe'}${a.subcategory?' › '+a.subcategory:''}`);
+    const head=h&&h!==lastH?`<tr class="click" onclick="CAT={g:${JSON.stringify(a.category||'Ohne Gruppe').replace(/"/g,'&quot;')},s:${JSON.stringify(a.subcategory||'').replace(/"/g,'&quot;')}};renderCatalog()"><td colspan="5" style="background:var(--bg);font-weight:600;font-size:13px">${esc(h)} ›</td></tr>`:'';lastH=h||lastH;
+    return head+`<tr><td>${esc(a.name)}${a.manufacturer?` <span class="mut">${esc(a.manufacturer)}</span>`:''}
       ${nc?`<span class="mut" style="display:block;font-size:12px">Case mit ${a.contents.filter(c=>c.kind==='verbaut').map(c=>esc(c.name)).join(', ')}</span>`:''}
       ${a.cases.length?`<span class="mut" style="display:block;font-size:12px">verbaut in ${a.cases.map(c=>esc(c.name)).join(', ')}</span>`:''}
-      ${!CAT.g&&a.category?`<span class="mut" style="display:block;font-size:12px">${esc(a.category)}${a.subcategory?' › '+esc(a.subcategory):''}</span>`:''}</td>
+</td>
       <td class="n" style="font-weight:600;color:${a.free<=0?'var(--warn)':'var(--ok)'}">${fnum(a.free)}${a.in_job?`<span class="mut" style="display:block;font-weight:400;font-size:11px">${fnum(a.in_job)} im Job</span>`:''}</td>
       <td class="n">${eur(a.price)}</td>
       <td class="n"><input type="number" id="cq-${a.id}" value="1" min="1" step="1" inputmode="numeric" style="width:58px"></td>
