@@ -48,6 +48,22 @@ tr.bad td{background:var(--warnbg)}
 .pill{display:inline-block;font-size:11px;padding:1px 7px;border-radius:9px;background:var(--bg);border:1px solid var(--line);color:var(--mut)}
 .pill.w{border-color:var(--warn);color:var(--warn)}
 .hide{display:none!important}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 0}
+.chip{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:99px;padding:6px 12px;cursor:pointer;min-height:32px}
+.chip.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.chip.s{font-size:12px;padding:4px 10px;min-height:28px;color:var(--mut)}
+.chip.s.on{color:var(--bg)}
+.cat{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-top:8px}
+.cat td,.cat th{padding:5px 8px}
+.cat th{position:sticky;top:0;background:var(--card);z-index:1}
+button.z{font:inherit;font-size:11px;border:1px solid var(--line);background:none;color:var(--mut);border-radius:6px;padding:3px 7px;cursor:pointer;white-space:nowrap}
+button.z.on{border-color:var(--warn);color:var(--warn)}
+button.add{font:inherit;font-weight:700;border:0;background:var(--acc);color:#fff;border-radius:8px;width:36px;height:32px;cursor:pointer}
+.opt{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:10px;margin:6px 0;cursor:pointer}
+.opt input{margin-top:3px}
+.tots{display:grid;grid-template-columns:auto auto;justify-content:end;gap:2px 16px;margin-top:10px;text-align:right}
+.tots .g{font-size:18px;font-weight:700}
+#modal select{max-width:100%}
 #toast{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:8px;opacity:0;transition:.2s;pointer-events:none;z-index:30}
 #toast.on{opacity:1}
 #modal{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px}
@@ -109,17 +125,21 @@ tr.bad td{background:var(--warnbg)}
         <label>Von<input type="date" id="j-start"></label>
         <label>Bis<input type="date" id="j-end"></label>
         <label style="flex:0 1 110px">Faktor<input type="number" step="0.1" id="j-factor" inputmode="decimal"></label>
+        <label style="flex:0 1 130px">Rabatt % gesamt<input type="number" step="0.5" min="0" max="100" id="j-discount" inputmode="decimal"></label>
         <button class="b" onclick="saveJob()">Speichern</button>
       </div>
       <label class="mut" style="display:block;margin-top:8px">Notiz<textarea id="j-notes"></textarea></label>
     </div>
 
     <div class="card">
-      <div class="row">
-        <label style="flex:3 1 220px">Artikel buchen<input id="add-art" list="art-dl" placeholder="Suchen…"></label>
-        <label style="flex:0 1 80px">Menge<input type="number" id="add-qty" value="1" min="0" step="1" inputmode="numeric"></label>
-        <button class="b p" onclick="addArticle()">Hinzufügen</button>
-      </div>
+      <h2>Material buchen</h2>
+      <input id="cat-q" placeholder="Suchen: Name, Hersteller, Inv.-Nr. …" style="width:100%" oninput="renderCatalog()">
+      <div class="chips" id="cat-chips"></div>
+      <div class="chips" id="cat-sub"></div>
+      <div class="cat"><table>
+        <thead><tr><th>Artikel</th><th class="n">Frei</th><th class="n">Preis/Tag</th><th class="n">Menge</th><th></th></tr></thead>
+        <tbody id="cat-tb"></tbody>
+      </table></div>
       <datalist id="art-dl"></datalist>
       <details style="margin-top:8px"><summary class="mut">Freie Position (Personal, Fahrt, Zukauf …)</summary>
         <div class="row" style="margin-top:8px">
@@ -137,8 +157,8 @@ tr.bad td{background:var(--warnbg)}
         <thead><tr><th>Bezeichnung</th><th class="n">Menge</th><th class="n">Preis/Tag</th><th class="n">Faktor</th><th class="n">Rabatt %</th><th class="n">Summe</th><th></th></tr></thead>
         <tbody id="pos-tb"></tbody>
       </table></div>
-      <div class="tot" id="j-total"></div>
-      <div class="mut">Faktor leer = Job-Faktor. Menge am Hauptartikel ändert das Zubehör mit.</div>
+      <div class="tots" id="j-total"></div>
+      <div class="mut" style="margin-top:6px">Faktor leer = Job-Faktor. Menge am Hauptartikel ändert Zubehör und Case-Inhalt mit. „0 €“ = Position bleibt gebucht, wird aber nicht verrechnet.</div>
     </div>
   </div>
 </section>
@@ -149,7 +169,8 @@ tr.bad td{background:var(--warnbg)}
     <h2 id="af-title">Neuer Artikel</h2>
     <div class="row">
       <label style="flex:3 1 200px">Bezeichnung<input id="af-name"></label>
-      <label>Kategorie<input id="af-category" list="cat-dl"></label>
+      <label>Gruppe<input id="af-category" list="cat-dl" placeholder="z. B. Video"></label>
+      <label>Untergruppe<input id="af-subcategory" list="sub-dl" placeholder="z. B. Kreuzschienen"></label>
       <label style="flex:0 1 90px">Bestand<input type="number" id="af-stock" value="1" inputmode="numeric"></label>
       <label style="flex:0 1 110px">Preis/Tag<input type="number" step="0.01" id="af-price" value="0" inputmode="decimal"></label>
     </div>
@@ -168,10 +189,10 @@ tr.bad td{background:var(--warnbg)}
       <button class="b p" onclick="saveArticle()">Speichern</button>
       <button class="b hide" id="af-cancel" onclick="resetArticleForm()">Abbrechen</button>
       <span style="flex:1"></span>
-      <label class="b" style="flex:0 0 auto">CSV importieren<input type="file" accept=".csv,.txt,text/csv,text/plain" class="hide" onchange="importCsv(this)"></label>
+      <label class="b" style="flex:0 0 auto">Importieren (Excel/CSV, z. B. EventWorx)<input type="file" accept=".xlsx,.xlsm,.csv,.txt,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hide" onchange="importWizard(this)"></label>
       <button class="b" onclick="kpAutomap()">Kabelplan: automatisch zuordnen</button>
     </div>
-    <datalist id="cat-dl"></datalist>
+    <datalist id="cat-dl"></datalist><datalist id="sub-dl"></datalist>
 
     <div id="units-box" class="hide" style="margin-top:14px;border-top:1px solid var(--line);padding-top:10px">
       <h2>Einzelgeräte <span class="mut" style="font-weight:400;font-size:13px">– optional; wenn erfasst, ist Bestand = Anzahl Geräte</span></h2>
@@ -190,12 +211,15 @@ tr.bad td{background:var(--warnbg)}
     </div>
 
     <div id="links-box" class="hide" style="margin-top:14px;border-top:1px solid var(--line);padding-top:10px">
-      <h2>Wird automatisch mitgebucht</h2>
+      <h2>Verknüpfungen</h2>
+      <p class="mut" style="margin:0 0 6px"><b>Zubehör</b> wird mit diesem Artikel mitgebucht (z. B. Stromkabel). Ist dieser Artikel ein <b>Case</b>, trage die eingebauten Geräte als „im Case verbaut“ ein: Wer eines davon bucht, bekommt das ganze Case mit Inhalt angeboten.</p>
       <table><tbody id="links-tb"></tbody></table>
+      <div id="inside-of" style="margin-top:6px"></div>
       <div class="row" style="margin-top:8px">
-        <label style="flex:3 1 200px">Zubehör<input id="lk-art" list="art-dl" placeholder="Suchen…"></label>
+        <label style="flex:3 1 200px">Artikel<input id="lk-art" list="art-dl" placeholder="Suchen…"></label>
+        <label style="flex:1 1 170px">Art<select id="lk-kind"><option value="zubehoer">Zubehör (wird mitgebucht)</option><option value="verbaut">Im Case verbaut</option></select></label>
         <label style="flex:0 1 90px">Menge je<input type="number" id="lk-qty" value="1" step="1" inputmode="decimal"></label>
-        <label style="flex:0 1 auto;flex-direction:row;align-items:center;gap:6px;color:var(--fg)"><input type="checkbox" id="lk-inc"> inklusive (0 €)</label>
+        <label style="flex:0 1 auto;flex-direction:row;align-items:center;gap:6px;color:var(--fg)"><input type="checkbox" id="lk-inc"> immer 0 €</label>
         <button class="b" onclick="addLink()">Verknüpfen</button>
       </div>
     </div>
@@ -203,7 +227,7 @@ tr.bad td{background:var(--warnbg)}
   <div class="card">
     <input id="a-filter" placeholder="Filtern…" style="width:100%;margin-bottom:8px" oninput="renderArticles()">
     <div class="tw"><table>
-      <thead><tr><th>Kategorie</th><th>Artikel</th><th class="n">Bestand</th><th class="n">Preis/Tag</th><th></th></tr></thead>
+      <thead><tr><th>Gruppe</th><th>Artikel</th><th class="n">Bestand</th><th class="n">Preis/Tag</th><th></th></tr></thead>
       <tbody id="art-tb"></tbody>
     </table></div>
   </div>
@@ -262,12 +286,12 @@ const DBNAME='kleem-lager', LSKEY='kleem-lager-state-v1';
 const K_LAGER_BRIDGE='kleem.lager.export.v1', K_KP_LIB='kleem.kabelplan.library.v1', K_KP_PACK='kleem.kabelplan.packlisten.v1';
 const MAX_LINK_DEPTH=5;
 let S=null;
-function blank(){return{v:1,seq:{a:0,u:0,l:0,j:0,p:0},articles:[],units:[],links:[],jobs:[],positions:[],kp_map:{},kp_devices:[],lastBackup:null};}
+function blank(){return{v:1,seq:{a:0,u:0,l:0,j:0,p:0},articles:[],units:[],links:[],jobs:[],positions:[],kp_map:{},kp_devices:[],importMaps:{},lastBackup:null};}
 function idb(){return new Promise((res,rej)=>{if(!('indexedDB' in window))return rej('no idb');const r=indexedDB.open(DBNAME,1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
 async function loadState(){
   try{const db=await idb();S=await new Promise((res,rej)=>{const t=db.transaction('kv').objectStore('kv').get('state');t.onsuccess=()=>res(t.result||null);t.onerror=()=>rej(t.error);});}catch(e){}
   if(!S){try{const r=localStorage.getItem(LSKEY);if(r)S=JSON.parse(r);}catch(e){}}
-  S=Object.assign(blank(),S||{});
+  S=Object.assign(blank(),S||{});migrateState();
   try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist();}catch(e){}
 }
 let saveT;
@@ -278,6 +302,8 @@ function persist(){clearTimeout(saveT);saveT=setTimeout(async()=>{
   try{localStorage.setItem(K_LAGER_BRIDGE,JSON.stringify(lagerBridge()));}catch(e){}
 },200);}
 const nid=k=>++S.seq[k];
+function migrateState(){S.articles.forEach(a=>{if(a.subcategory==null)a.subcategory='';});S.links.forEach(l=>{if(!l.kind)l.kind='zubehoer';});
+  S.jobs.forEach(j=>{if(j.discount==null)j.discount=0;});S.importMaps=S.importMaps||{};}
 class ApiError extends Error{constructor(status,detail){super(detail);this.status=status;this.detail=detail;}}
 const err=(s,d)=>{throw new ApiError(s,d);};
 const art=id=>S.articles.find(a=>a.id===id);
@@ -287,15 +313,18 @@ const r2=v=>Math.round((v+Number.EPSILON)*100)/100;
 /* ---------- Artikel ---------- */
 function listArticles(){
   const cnt={},ucnt={};S.links.forEach(l=>cnt[l.parent_id]=(cnt[l.parent_id]||0)+1);S.units.forEach(u=>ucnt[u.article_id]=(ucnt[u.article_id]||0)+1);
-  return S.articles.slice().sort((a,b)=>(a.category||'').localeCompare(b.category||'','de')||a.name.localeCompare(b.name,'de',{numeric:true}))
+  return S.articles.slice().sort((a,b)=>(a.category||'').localeCompare(b.category||'','de')||(a.subcategory||'').localeCompare(b.subcategory||'','de')||a.name.localeCompare(b.name,'de',{numeric:true}))
     .map(a=>({...a,link_count:cnt[a.id]||0,unit_count:ucnt[a.id]||0}));
 }
-function articleFields(b){return{name:String(b.name||'').trim(),category:b.category||'',stock:parseInt(b.stock)||0,price:+b.price||0,notes:b.notes||'',
+function articleFields(b){return{name:String(b.name||'').trim(),category:String(b.category||'').trim(),subcategory:String(b.subcategory||'').trim(),stock:parseInt(b.stock)||0,price:+b.price||0,notes:b.notes||'',
   manufacturer:b.manufacturer||'',inv_no:b.inv_no||'',purchase_date:b.purchase_date||null,value:+b.value||0,kabelplan_id:String(b.kabelplan_id||'').trim()};}
+const casesOf=aid=>S.links.filter(l=>l.kind==='verbaut'&&l.child_id===aid).map(l=>art(l.parent_id)).filter(Boolean);
+const contentsOf=aid=>S.links.filter(l=>l.parent_id===aid).map(l=>({id:l.child_id,name:(art(l.child_id)||{}).name||'?',qty:l.qty,kind:l.kind,included:l.included})).sort((a,b)=>(a.kind>b.kind?-1:a.kind<b.kind?1:0)||a.name.localeCompare(b.name,'de'));
 function syncStock(aid){const n=S.units.filter(u=>u.article_id===aid).length;if(n)art(aid).stock=n;}
 function cycle(parent,child){const stack=[child],seen=new Set();while(stack.length){const c=stack.pop();if(c===parent)return true;if(seen.has(c))continue;seen.add(c);S.links.filter(l=>l.parent_id===c).forEach(l=>stack.push(l.child_id));}return false;}
 
 /* ---------- Jobs / Positionen ---------- */
+function totals(job,ps){const sub=r2(ps.reduce((s,p)=>s+p.total,0));const d=+job.discount||0;const da=r2(sub*d/100);return{subtotal:sub,discount:d,discount_amount:da,total:r2(sub-da)};}
 function lineTotal(p,jf){if(p.included)return 0;const f=p.factor!=null?p.factor:jf;return r2((p.qty||0)*(p.price||0)*(f||0)*(1-(p.discount||0)/100));}
 function positionsOf(job){
   const ps=S.positions.filter(p=>p.job_id===job.id).sort((a,b)=>a.id-b.id).map(p=>({...p,category:(art(p.article_id)||{}).category||null}));
@@ -314,16 +343,18 @@ function getJob(jid){
   ps.forEach(p=>{if(p.article_id!=null)need[p.article_id]=(need[p.article_id]||0)+p.qty;});
   const warnings={};Object.entries(need).forEach(([aid,q])=>{const a=art(+aid);const st=a?a.stock:0;const free=st-(other[aid]||0);if(q>free)warnings[aid]={need:q,free,stock:st};});
   ps.forEach(p=>p.warning=warnings[p.article_id]||null);
-  job.positions=ps;job.total=r2(ps.reduce((s,p)=>s+p.total,0));job.warning_count=Object.keys(warnings).length;return job;
+  job.positions=ps;Object.assign(job,totals(job,ps));job.warning_count=Object.keys(warnings).length;return job;
 }
-function addArticlePos(job_id,article_id,qty,parent=null,link_qty=null,included=false,depth=0,path=[],source=''){
+function addArticlePos(job_id,article_id,qty,parent=null,link_qty=null,included=false,depth=0,path=[],source='',link_kind=''){
   const a=art(article_id)||err(404,'Artikel nicht gefunden');
-  const p={id:nid('p'),job_id,article_id,parent_pos_id:parent,link_qty,name:a.name,qty,price:a.price,factor:null,discount:0,included:included?1:0,source};
+  const p={id:nid('p'),job_id,article_id,parent_pos_id:parent,link_qty,link_kind,name:a.name,qty,price:a.price,factor:null,discount:0,included:included?1:0,source};
   S.positions.push(p);
   if(depth<MAX_LINK_DEPTH)S.links.filter(l=>l.parent_id===article_id).forEach(l=>{if(path.includes(l.child_id)||l.child_id===article_id)return;
-    addArticlePos(job_id,l.child_id,qty*l.qty,p.id,l.qty,!!l.included,depth+1,[...path,article_id],source);});
+    addArticlePos(job_id,l.child_id,qty*l.qty,p.id,l.qty,!!l.included,depth+1,[...path,article_id],source,l.kind);});
   return p.id;
 }
+function billOnly(root,aid){let kept=false;const walk=pid=>{const p=S.positions.find(x=>x.id===pid);if(!kept&&p.article_id===aid&&pid!==root){kept=true;return;}
+  p.included=1;S.positions.filter(c=>c.parent_pos_id===pid).forEach(c=>walk(c.id));};walk(root);}
 function rescale(pid,qty){S.positions.filter(c=>c.parent_pos_id===pid).forEach(c=>{if(c.link_qty!=null){c.qty=qty*c.link_qty;rescale(c.id,c.qty);}});}
 function deletePos(pid){const kids=S.positions.filter(p=>p.parent_pos_id===pid).map(p=>p.id);S.positions=S.positions.filter(p=>p.id!==pid);kids.forEach(deletePos);}
 
@@ -349,7 +380,7 @@ function availForJob(job){const other=bookedElsewhere(job.start_date,job.end_dat
   S.articles.filter(a=>a.kabelplan_id).forEach(a=>out[a.kabelplan_id]=(out[a.kabelplan_id]||0)+Math.max(0,a.stock-Math.round(other[a.id]||0)));return out;}
 function lagerJobExport(jid){
   const job=jobBy(jid)||err(404,'Job nicht gefunden');const ps=positionsOf(job);const pos=[];
-  ps.forEach(p=>{const a=art(p.article_id);const typ=!a?'frei':(p.depth===0?'artikel':'zubehoer');if(p.source==='kabelplan'&&typ!=='artikel')return;
+  ps.forEach(p=>{const a=art(p.article_id);const isCase=a&&S.links.some(l=>l.parent_id===a.id&&l.kind==='verbaut');const typ=!a?'frei':isCase?'case':((p.depth===0||p.link_kind==='verbaut')?'artikel':'zubehoer');if(p.source==='kabelplan'&&typ!=='artikel')return;
     pos.push({typ,kabelplan_id:(a&&a.kabelplan_id)||'',hersteller:(a&&a.manufacturer)||'',bezeichnung:p.name,kategorie:(a&&a.category)||'',menge:p.qty});});
   return{kind:'kleem-lager-job',v:1,job:{id:job.id,name:job.name,kunde:job.customer,von:job.start_date,bis:job.end_date,ort:job.location},
     positionen:pos,inventar:Object.entries(availForJob(job)).map(([k,v])=>({kabelplan_id:k,bestand:v}))};
@@ -366,7 +397,7 @@ function packPreview(jid,d){
   if(!d||d.kind!=='kleem-kabelplan-packliste')err(400,'Das ist keine Packliste aus dem Kabelplan');
   jobBy(jid)||err(404,'Job nicht gefunden');
   const byKp={};S.articles.forEach(a=>{if(a.kabelplan_id&&!byKp[a.kabelplan_id])byKp[a.kabelplan_id]=a;});
-  const booked={};S.positions.filter(p=>p.job_id===jid&&p.parent_pos_id==null&&p.article_id!=null&&p.source!=='kabelplan').forEach(p=>booked[p.article_id]=(booked[p.article_id]||0)+p.qty);
+  const booked={};S.positions.filter(p=>p.job_id===jid&&(p.parent_pos_id==null||p.link_kind==='verbaut')&&p.article_id!=null&&p.source!=='kabelplan').forEach(p=>booked[p.article_id]=(booked[p.article_id]||0)+p.qty);
   const need={};(d.geraete||[]).forEach(g=>need[g.kabelplan_id]=(need[g.kabelplan_id]||0)+g.menge);
   const lines=[];
   (d.geraete||[]).forEach(g=>{const h=g.hersteller||'',n=g.bezeichnung||'';const label=!h||norm(n).startsWith(norm(h))?n:h+' '+n;
@@ -405,6 +436,34 @@ function parseCsv(text){
 }
 function num(v,def=0){v=String(v||'').trim().replace(/€/g,'').replace(/\s/g,'');if(!v)return def;if(v.includes(','))v=v.replace(/\./g,'').replace(',','.');const n=parseFloat(v);return isNaN(n)?def:n;}
 
+/* ---------- Import (EventWorx & Co.) ---------- */
+function toDate(v){if(v==null||v==='')return null;if(typeof v==='number'&&v>20000&&v<80000)return new Date(Math.round((v-25569)*864e5)).toISOString().slice(0,10);
+  v=String(v).trim();let m=v.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return m[0];m=v.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
+  if(m){let y=+m[3];if(y<100)y+=2000;return`${y}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;}return null;}
+const numv=(v,d=0)=>typeof v==='number'?v:num(v,d);
+function importRows(rows,opt){
+  const merge=!!opt.merge,update=!!opt.update;const res={created:0,updated:0,units:0,skipped:0};
+  const groups=[];const gi={};
+  rows.forEach(r=>{const name=String(r.name??'').trim();if(!name){res.skipped++;return;}
+    const k=merge?norm(name)+'|'+norm(r.manufacturer):'#'+groups.length;if(!gi[k]){gi[k]={rows:[]};groups.push(gi[k]);}gi[k].rows.push({...r,name});});
+  groups.forEach(g=>{const b=g.rows[0];const ser=g.rows.filter(r=>String(r.serial??'').trim());
+    const f={name:b.name,category:String(b.category??'').trim(),subcategory:String(b.subcategory??'').trim(),manufacturer:String(b.manufacturer??'').trim(),
+      price:numv(b.price),value:numv(b.value),notes:String(b.notes??'').trim(),kabelplan_id:String(b.kabelplan_id??'').trim(),
+      inv_no:ser.length?'':String(b.inv_no??'').trim(),purchase_date:ser.length?null:toDate(b.purchase_date)};
+    const stock=g.rows.reduce((s,r)=>s+('stock' in r&&String(r.stock).trim()!==''?Math.round(numv(r.stock)):1),0);
+    let a=null;
+    if(update){a=(f.inv_no&&S.articles.find(x=>x.inv_no&&x.inv_no===f.inv_no))||S.articles.find(x=>norm(x.name)===norm(f.name)&&(!f.manufacturer||!x.manufacturer||norm(x.manufacturer)===norm(f.manufacturer)));}
+    if(a){Object.entries(f).forEach(([k,v])=>{if(v!==''&&v!=null&&!(k==='price'&&opt.keepPrice))a[k]=v;});res.updated++;}
+    else{a={id:nid('a'),...articleFields(f),stock:0};S.articles.push(a);res.created++;}
+    if(ser.length){const have=new Set(S.units.filter(u=>u.article_id===a.id).map(u=>u.serial));
+      g.rows.forEach(r=>{const sn=String(r.serial??'').trim();const n=sn?1:('stock' in r&&String(r.stock).trim()!==''?Math.round(numv(r.stock)):1);
+        for(let i=0;i<n;i++){if(sn&&have.has(sn))continue;S.units.push({id:nid('u'),article_id:a.id,serial:sn,inv_no:String(r.inv_no??'').trim(),purchase_date:toDate(r.purchase_date),
+          value:r.value!=null&&String(r.value).trim()!==''?numv(r.value):null,notes:sn?'':String(r.notes??'').trim()});res.units++;if(sn)have.add(sn);}});
+      syncStock(a.id);}
+    else if(!S.units.some(u=>u.article_id===a.id))a.stock=stock;});
+  return res;
+}
+
 /* =========================================================================
    API-Schicht: gleiche Pfade wie die Server-Version, damit die Oberfläche gleich bleibt
    ========================================================================= */
@@ -419,20 +478,26 @@ const routes=[
  ['DELETE',/^\/units\/(\d+)$/,m=>{const u=S.units.find(x=>x.id===+m[1])||err(404,'Gerät nicht gefunden');S.units=S.units.filter(x=>x!==u);syncStock(u.article_id);return{ok:true};}],
  ['GET',/^\/articles\/(\d+)\/links$/,m=>S.links.filter(l=>l.parent_id===+m[1]).map(l=>({...l,child_name:(art(l.child_id)||{}).name,child_price:(art(l.child_id)||{}).price})).sort((a,b)=>(a.child_name||'').localeCompare(b.child_name||'','de'))],
  ['POST',/^\/articles\/(\d+)\/links$/,(m,b)=>{const p=+m[1],c=+b.child_id;if(p===c||cycle(p,c))err(400,'Verknüpfung würde eine Schleife erzeugen');
-   const ex=S.links.find(l=>l.parent_id===p&&l.child_id===c);if(ex){ex.qty=+b.qty||1;ex.included=b.included?1:0;}else S.links.push({id:nid('l'),parent_id:p,child_id:c,qty:+b.qty||1,included:b.included?1:0});return{ok:true};}],
+   const kind=b.kind==='verbaut'?'verbaut':'zubehoer';
+   const ex=S.links.find(l=>l.parent_id===p&&l.child_id===c);if(ex){ex.qty=+b.qty||1;ex.included=b.included?1:0;ex.kind=kind;}else S.links.push({id:nid('l'),parent_id:p,child_id:c,qty:+b.qty||1,included:b.included?1:0,kind});return{ok:true};}],
+ ['PUT',/^\/links\/(\d+)$/,(m,b)=>{const l=S.links.find(x=>x.id===+m[1])||err(404,'Verknüpfung nicht gefunden');if(b.qty!=null)l.qty=+b.qty||1;if(b.included!=null)l.included=b.included?1:0;if(b.kind)l.kind=b.kind;return{ok:true};}],
+ ['POST',/^\/articles\/import2$/,(m,b)=>importRows(b.rows||[],b)],
+ ['GET',/^\/jobs\/(\d+)\/catalog$/,m=>{const job=jobBy(+m[1])||err(404,'Job nicht gefunden');const other=bookedElsewhere(job.start_date,job.end_date,job.id);const mine={};
+   S.positions.filter(p=>p.job_id===job.id&&p.article_id!=null).forEach(p=>mine[p.article_id]=(mine[p.article_id]||0)+p.qty);
+   return listArticles().map(a=>({...a,free:a.stock-(other[a.id]||0)-(mine[a.id]||0),in_job:mine[a.id]||0,cases:casesOf(a.id).map(c=>({id:c.id,name:c.name})),contents:contentsOf(a.id)}));}],
  ['DELETE',/^\/links\/(\d+)$/,m=>{S.links=S.links.filter(l=>l.id!==+m[1]);return{ok:true};}],
  ['POST',/^\/articles\/import$/,(m,b)=>{let rows=parseCsv(b.text);if(rows.length&&!/\d/.test((rows[0].slice(2,4)).join('')))rows=rows.slice(1);let n=0;
    rows.forEach(r=>{if(!r.length||!String(r[0]).trim())return;while(r.length<9)r.push('');
      S.articles.push({id:nid('a'),name:r[0].trim(),category:r[1].trim(),stock:Math.trunc(num(r[2])),price:num(r[3]),notes:r[4].trim(),manufacturer:r[5].trim(),inv_no:r[6].trim(),purchase_date:null,value:num(r[7]),kabelplan_id:r[8].trim()});n++;});return{imported:n};}],
- ['GET',/^\/jobs$/,()=>S.jobs.slice().sort((a,b)=>(b.start_date||'').localeCompare(a.start_date||'')||b.id-a.id).map(j=>({...j,total:r2(positionsOf(j).reduce((s,p)=>s+p.total,0))}))],
- ['POST',/^\/jobs$/,(m,b)=>{const j={id:nid('j'),name:String(b.name||'').trim(),customer:b.customer||'',start_date:b.start_date||null,end_date:b.end_date||b.start_date||null,location:b.location||'',notes:b.notes||'',factor:b.factor==null?1:+b.factor};S.jobs.push(j);return{id:j.id};}],
- ['PUT',/^\/jobs\/(\d+)$/,(m,b)=>{const j=jobBy(+m[1])||err(404,'Job nicht gefunden');Object.assign(j,{name:b.name,customer:b.customer||'',start_date:b.start_date||null,end_date:b.end_date||b.start_date||null,location:b.location||'',notes:b.notes||'',factor:+b.factor||1});return{ok:true};}],
+ ['GET',/^\/jobs$/,()=>S.jobs.slice().sort((a,b)=>(b.start_date||'').localeCompare(a.start_date||'')||b.id-a.id).map(j=>({...j,total:totals(j,positionsOf(j)).total}))],
+ ['POST',/^\/jobs$/,(m,b)=>{const j={id:nid('j'),name:String(b.name||'').trim(),customer:b.customer||'',start_date:b.start_date||null,end_date:b.end_date||b.start_date||null,location:b.location||'',notes:b.notes||'',factor:b.factor==null?1:+b.factor,discount:+b.discount||0};S.jobs.push(j);return{id:j.id};}],
+ ['PUT',/^\/jobs\/(\d+)$/,(m,b)=>{const j=jobBy(+m[1])||err(404,'Job nicht gefunden');Object.assign(j,{name:b.name,customer:b.customer||'',start_date:b.start_date||null,end_date:b.end_date||b.start_date||null,location:b.location||'',notes:b.notes||'',factor:+b.factor||1,discount:Math.min(100,Math.max(0,+b.discount||0))});return{ok:true};}],
  ['DELETE',/^\/jobs\/(\d+)$/,m=>{const id=+m[1];S.jobs=S.jobs.filter(j=>j.id!==id);S.positions=S.positions.filter(p=>p.job_id!==id);return{ok:true};}],
  ['POST',/^\/jobs\/(\d+)\/copy$/,m=>{const j=jobBy(+m[1])||err(404,'Job nicht gefunden');const n={...j,id:nid('j'),name:j.name+' (Kopie)'};S.jobs.push(n);const map={};
    S.positions.filter(p=>p.job_id===j.id).sort((a,b)=>a.id-b.id).forEach(p=>{const q={...p,id:nid('p'),job_id:n.id,parent_pos_id:p.parent_pos_id!=null?map[p.parent_pos_id]??null:null};map[p.id]=q.id;S.positions.push(q);});return{id:n.id};}],
  ['GET',/^\/jobs\/(\d+)$/,m=>getJob(+m[1])],
  ['POST',/^\/jobs\/(\d+)\/positions$/,(m,b)=>{const jid=+m[1];jobBy(jid)||err(404,'Job nicht gefunden');
-   if(b.article_id){const pid=addArticlePos(jid,+b.article_id,+b.qty||1);if(b.price!=null)S.positions.find(p=>p.id===pid).price=+b.price;return{id:pid};}
+   if(b.article_id){const pid=addArticlePos(jid,+b.article_id,+b.qty||1);if(b.price!=null)S.positions.find(p=>p.id===pid).price=+b.price;if(b.bill_only)billOnly(pid,+b.bill_only);return{id:pid};}
    if(!String(b.name||'').trim())err(400,'Bezeichnung fehlt');const p={id:nid('p'),job_id:jid,article_id:null,parent_pos_id:null,link_qty:null,name:b.name.trim(),qty:+b.qty||1,price:+b.price||0,factor:1,discount:0,included:0,source:''};S.positions.push(p);return{id:p.id};}],
  ['PUT',/^\/positions\/(\d+)$/,(m,u)=>{const p=S.positions.find(x=>x.id===+m[1])||err(404,'Position nicht gefunden');
    ['name','price','discount'].forEach(k=>{if(u[k]!=null)p[k]=u[k];});if(u.included!=null)p.included=u.included?1:0;
@@ -495,6 +560,7 @@ async function loadArticles(){
   ARTS = await api('/articles');
   $('art-dl').innerHTML = ARTS.map(a => `<option value="${esc(a.name)}">${esc(a.category)} · ${eur(a.price)}</option>`).join('');
   $('cat-dl').innerHTML = [...new Set(ARTS.map(a=>a.category).filter(Boolean))].map(c=>`<option value="${esc(c)}">`).join('');
+  $('sub-dl').innerHTML = [...new Set(ARTS.map(a=>a.subcategory).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'de')).map(c=>`<option value="${esc(c)}">`).join('');
   renderArticles();
 }
 async function loadKp(){KP = await api('/kabelplan/devices');$('kp-dl').innerHTML = KP.map(d => `<option value="${esc(d.label)}">${esc(d.grp||'')}</option>`).join('');}
@@ -502,25 +568,26 @@ const kpLabel = id => (KP.find(d => d.id===id)||{}).label || '';
 function kpIdFrom(v){v=v.trim();if(!v)return'';const d=KP.find(d=>d.label===v)||KP.find(d=>d.id===v)||KP.find(d=>d.label.toLowerCase()===v.toLowerCase());return d?d.id:null;}
 function renderArticles(){
   const f = $('a-filter').value.toLowerCase();
-  $('art-tb').innerHTML = ARTS.filter(a => (a.name+' '+a.category+' '+(a.manufacturer||'')).toLowerCase().includes(f)).map(a => `
+  const inCase={},content={};S.links.forEach(l=>{if(l.kind==='verbaut'){(inCase[l.child_id]??=[]).push(l.parent_id);content[l.parent_id]=(content[l.parent_id]||0)+1;}});
+  $('art-tb').innerHTML = ARTS.filter(a => (a.name+' '+a.category+' '+a.subcategory+' '+(a.manufacturer||'')+' '+(a.inv_no||'')).toLowerCase().includes(f)).map(a => {const acc=a.link_count-(content[a.id]||0);return `
     <tr class="click" onclick="editArticle(${a.id})">
-      <td class="mut">${esc(a.category)}</td>
-      <td>${esc(a.name)} ${a.kabelplan_id?`<span class="pill" title="${esc(kpLabel(a.kabelplan_id))}">Kabelplan</span>`:''} ${a.link_count?`<span class="pill">+${a.link_count} Zubehör</span>`:''} ${a.unit_count?`<span class="pill">${a.unit_count} SN</span>`:''}</td>
+      <td class="mut">${esc(a.category)}${a.subcategory?`<span style="display:block;font-size:12px">${esc(a.subcategory)}</span>`:''}</td>
+      <td>${esc(a.name)} ${a.kabelplan_id?`<span class="pill" title="${esc(kpLabel(a.kabelplan_id))}">Kabelplan</span>`:''} ${content[a.id]?`<span class="pill">Case · ${content[a.id]} Geräte</span>`:''} ${inCase[a.id]?`<span class="pill">im Case</span>`:''} ${acc?`<span class="pill">+${acc} Zubehör</span>`:''} ${a.unit_count?`<span class="pill">${a.unit_count} SN</span>`:''}</td>
       <td class="n">${a.stock}</td><td class="n">${eur(a.price)}</td>
       <td class="n"><button class="x" title="Löschen" onclick="event.stopPropagation();delArticle(${a.id})">×</button></td>
-    </tr>`).join('') || '<tr><td colspan="5" class="mut">Noch keine Artikel. Lege oben einen an oder importiere eine CSV.</td></tr>';
+    </tr>`}).join('') || '<tr><td colspan="5" class="mut">Noch keine Artikel. Lege oben einen an oder importiere deine Liste (Excel/CSV).</td></tr>';
 }
 function findArt(name){name=name.trim().toLowerCase();if(!name)return null;return ARTS.find(a=>a.name.toLowerCase()===name)||ARTS.find(a=>a.name.toLowerCase().includes(name));}
 function resetArticleForm(){
   EDIT_ART = null;
-  ['name','category','notes','manufacturer','inv_no','purchase_date','kp'].forEach(k => $('af-'+k).value=''); $('af-kp-hint').textContent='';
+  ['name','category','subcategory','notes','manufacturer','inv_no','purchase_date','kp'].forEach(k => $('af-'+k).value=''); $('af-kp-hint').textContent='';
   $('af-stock').value=1; $('af-price').value=0; $('af-value').value=0; $('af-stock').disabled=false;
   $('units-box').classList.add('hide'); $('af-title').textContent='Neuer Artikel';
   $('af-cancel').classList.add('hide'); $('links-box').classList.add('hide');
 }
 async function editArticle(id){
   const a = ARTS.find(x => x.id===id); EDIT_ART = a;
-  ['name','category','stock','price','notes','manufacturer','inv_no','purchase_date','value'].forEach(k => $('af-'+k).value = a[k] ?? '');
+  ['name','category','subcategory','stock','price','notes','manufacturer','inv_no','purchase_date','value'].forEach(k => $('af-'+k).value = a[k] ?? '');
   $('af-kp').value = kpLabel(a.kabelplan_id) || a.kabelplan_id || ''; $('af-kp-hint').textContent = a.kabelplan_id ? '('+a.kabelplan_id+')' : '';
   $('af-stock').disabled = !!a.unit_count; $('units-box').classList.remove('hide'); loadUnits();
   $('af-title').textContent='Artikel bearbeiten';
@@ -528,7 +595,7 @@ async function editArticle(id){
   loadLinks(); window.scrollTo({top:0,behavior:'smooth'});
 }
 async function saveArticle(){
-  const b = {name:$('af-name').value.trim(), category:$('af-category').value.trim(),
+  const b = {name:$('af-name').value.trim(), category:$('af-category').value.trim(), subcategory:$('af-subcategory').value.trim(),
     stock:parseInt($('af-stock').value)||0, price:parseFloat($('af-price').value)||0, notes:$('af-notes').value,
     manufacturer:$('af-manufacturer').value.trim(), inv_no:$('af-inv_no').value.trim(),
     purchase_date:$('af-purchase_date').value||null, value:parseFloat($('af-value').value)||0};
@@ -563,19 +630,91 @@ async function refreshArt(){const id=EDIT_ART.id; await loadArticles(); editArti
 $('un-serial').addEventListener('keydown', e => e.key==='Enter' && addUnit());
 async function loadLinks(){
   const ls = await api(`/articles/${EDIT_ART.id}/links`);
-  $('links-tb').innerHTML = ls.map(l => `<tr>
-    <td>${fnum(l.qty)} ×</td><td>${esc(l.child_name)}</td>
-    <td class="n">${l.included ? '<span class="pill">inkl.</span>' : eur(l.child_price)}</td>
+  const kindLbl = k => k==='verbaut' ? '<span class="pill">im Case verbaut</span>' : '<span class="pill">Zubehör</span>';
+  $('links-tb').innerHTML = ls.sort((a,b)=>(a.kind==='verbaut'?0:1)-(b.kind==='verbaut'?0:1)).map(l => `<tr>
+    <td style="width:80px"><input type="number" step="1" inputmode="decimal" value="${l.qty}" style="width:60px" onchange="updLink(${l.id},{qty:+this.value})"> ×</td>
+    <td>${esc(l.child_name)} ${kindLbl(l.kind)}</td>
+    <td class="n"><button class="z ${l.included?'on':''}" title="Immer mit 0 € mitbuchen" onclick="updLink(${l.id},{included:${!l.included}})">${l.included?'0 €':eur(l.child_price)}</button></td>
     <td class="n"><button class="x" onclick="delLink(${l.id})">×</button></td></tr>`).join('')
-    || '<tr><td class="mut">Kein Zubehör verknüpft.</td></tr>';
+    || '<tr><td class="mut">Nichts verknüpft.</td></tr>';
+  const cs = casesOf(EDIT_ART.id);
+  $('inside-of').innerHTML = cs.length ? `<span class="mut">Verbaut in:</span> ${cs.map(c=>`<button class="chip s" onclick="editArticle(${c.id})">${esc(c.name)}</button>`).join(' ')}` : '';
 }
+async function updLink(id,b){await api('/links/'+id,'PUT',b); loadLinks()}
 async function addLink(){
   const a = findArt($('lk-art').value); if (!a) return toast('Artikel nicht gefunden');
-  await api(`/articles/${EDIT_ART.id}/links`,'POST',{child_id:a.id, qty:parseFloat($('lk-qty').value)||1, included:$('lk-inc').checked});
+  await api(`/articles/${EDIT_ART.id}/links`,'POST',{child_id:a.id, qty:parseFloat($('lk-qty').value)||1, included:$('lk-inc').checked, kind:$('lk-kind').value});
   $('lk-art').value=''; $('lk-qty').value=1; $('lk-inc').checked=false; loadLinks(); loadArticles();
 }
 async function delLink(id){await api('/links/'+id,'DELETE'); loadLinks(); loadArticles()}
 async function importCsv(inp){const t=await readCsvFile(inp.files[0]);inp.value='';const r=await api('/articles/import','POST',{text:t});toast(r.imported+' Artikel importiert');loadArticles();}
+
+// ---- Import-Assistent
+const IMP_FIELDS=[
+ ['name','Bezeichnung *',['bezeichnung','artikel','artikelname','artikelbezeichnung','name','produkt','produktname','gerät','geraet','gerätename','titel','beschreibung']],
+ ['category','Gruppe',['gruppe','kategorie','hauptgruppe','warengruppe','artikelgruppe','produktgruppe','bereich','abteilung','category','hauptkategorie']],
+ ['subcategory','Untergruppe',['untergruppe','unterkategorie','subgruppe','subkategorie','unterwarengruppe','sub category']],
+ ['manufacturer','Hersteller',['hersteller','marke','fabrikat','brand','manufacturer']],
+ ['stock','Bestand',['bestand','menge','anzahl','stück','stueck','stk','stk.','lagerbestand','qty','quantity','gesamtbestand','eigenbestand']],
+ ['price','Preis/Tag',['preis','mietpreis','tagespreis','preis/tag','preis pro tag','verleihpreis','miete','tagesmiete','vk','vk-preis','verkaufspreis','listenpreis']],
+ ['value','Wert/Stk (Wiederbeschaffung)',['wiederbeschaffungswert','wbw','neuwert','anschaffungswert','anschaffungspreis','einkaufspreis','ek','ek-preis','wert','zeitwert','versicherungswert']],
+ ['inv_no','Inv.-Nr.',['inventarnummer','inventar-nr','inventar-nr.','inv.-nr.','inv.-nr','inv-nr','invnr','inventarnr','artikelnummer','art.-nr.','art.-nr','artnr','artikel-nr','nummer','barcode','id']],
+ ['serial','Seriennummer',['seriennummer','serien-nr','serien-nr.','seriennr','sn','s/n','serial','serial number','seriennummern']],
+ ['purchase_date','Kaufdatum',['kaufdatum','anschaffungsdatum','einkaufsdatum','anschaffung','kauf','gekauft']],
+ ['notes','Notiz',['notiz','bemerkung','bemerkungen','kommentar','info','anmerkung','notizen']],
+ ['kabelplan_id','Kabelplan-ID',['kabelplan_id','kabelplan-id','kabelplan']]];
+const hnorm=h=>String(h??'').toLowerCase().replace(/[:*]/g,'').replace(/\s+/g,' ').trim();
+function cellVal(v){if(v==null)return'';if(v instanceof Date)return v.toISOString().slice(0,10);
+  if(typeof v==='object'){if('result' in v)return cellVal(v.result);if(v.richText)return v.richText.map(x=>x.text).join('');if('text' in v)return String(v.text??'');if(v.error)return'';return'';}return v;}
+async function readTable(file){
+  const n=file.name.toLowerCase();
+  if(/\.xls$/.test(n))throw new Error('Alte .xls-Datei: bitte in Excel/Numbers als .xlsx oder .csv speichern.');
+  if(/\.xls[xm]$/.test(n)){const wb=new ExcelJS.Workbook();await wb.xlsx.load(await file.arrayBuffer());
+    return wb.worksheets.map(ws=>{const rows=[];ws.eachRow({includeEmpty:false},r=>{const a=[];for(let i=1;i<=ws.columnCount;i++)a.push(cellVal(r.getCell(i).value));rows.push(a);});return{name:ws.name,rows};}).filter(x=>x.rows.length);}
+  return[{name:'CSV',rows:parseCsv(await readCsvFile(file)).filter(r=>r.some(c=>String(c).trim()))}];
+}
+function guessHeader(rows){let best=0,bs=0;rows.slice(0,15).forEach((r,i)=>{const sc=r.filter(c=>{const h=hnorm(c);return h&&IMP_FIELDS.some(f=>f[2].includes(h));}).length;if(sc>bs){bs=sc;best=i;}});return bs>=2?best:-1;}
+function guessMap(head){const used=new Set(),m={};
+  IMP_FIELDS.forEach(([k,,syn])=>{let i=-1;for(const x of syn){i=head.findIndex((h,j)=>!used.has(j)&&hnorm(h)===x);if(i>=0)break;}
+    if(i<0)i=head.findIndex((h,j)=>!used.has(j)&&hnorm(h).length>2&&syn.some(x=>x.length>3&&hnorm(h).includes(x)));
+    if(i>=0){m[k]=i;used.add(i);}});return m;}
+let IMP=null;
+async function importWizard(inp){
+  const f=inp.files[0];inp.value='';if(!f)return;
+  let sheets;try{sheets=await readTable(f);}catch(e){return toast(e.message||'Datei konnte nicht gelesen werden');}
+  if(!sheets.length)return toast('Die Datei ist leer');
+  IMP={file:f.name,sheets,si:0};impSheet(0);
+}
+function impSheet(si){const sh=IMP.sheets[si];IMP.si=si;IMP.hr=guessHeader(sh.rows);const head=IMP.hr>=0?sh.rows[IMP.hr]:sh.rows[0].map((_,i)=>'Spalte '+String.fromCharCode(65+i));
+  const sig=head.map(hnorm).join('|');IMP.sig=sig;IMP.map=S.importMaps[sig]?{...S.importMaps[sig]}:guessMap(head);IMP.head=head;impRender();}
+function impRows(){const sh=IMP.sheets[IMP.si];return sh.rows.slice(IMP.hr+1).map(r=>{const o={};Object.entries(IMP.map).forEach(([k,i])=>{if(i!=null&&i>=0)o[k]=r[i]??'';});return o;}).filter(o=>String(o.name??'').trim());}
+function impRender(){
+  const sh=IMP.sheets[IMP.si];const head=IMP.head;const width=Math.max(...sh.rows.slice(0,50).map(r=>r.length),head.length);
+  const sample=i=>{const r=sh.rows.slice(IMP.hr+1).find(r=>String(r[i]??'').trim());return r?String(r[i]).slice(0,30):'';};
+  const opts=k=>`<option value="-1">— nicht importieren —</option>`+Array.from({length:width},(_,i)=>`<option value="${i}" ${IMP.map[k]===i?'selected':''}>${esc(head[i]||'Spalte '+(i+1))}${sample(i)?' · z. B. '+esc(sample(i)):''}</option>`).join('');
+  const rows=impRows();const hasSer=IMP.map.serial>=0&&IMP.map.serial!=null;
+  modal(`<h2>Import: ${esc(IMP.file)}</h2>
+    ${IMP.sheets.length>1?`<div class="row"><label>Tabellenblatt<select id="im-sheet">${IMP.sheets.map((x,i)=>`<option value="${i}" ${i===IMP.si?'selected':''}>${esc(x.name)} (${x.rows.length} Zeilen)</option>`).join('')}</select></label></div>`:''}
+    <p class="mut">${IMP.hr>=0?`Überschriften in Zeile ${IMP.hr+1} erkannt.`:'Keine Überschriften erkannt – Spalten bitte zuordnen.'} ${rows.length} Artikelzeilen. Prüfe die Zuordnung, sie wird für Dateien mit gleichen Spalten gemerkt.</p>
+    <div class="tw"><table>${IMP_FIELDS.map(([k,l])=>`<tr><td style="width:40%">${l}</td><td><select data-k="${k}">${opts(k)}</select></td></tr>`).join('')}</table></div>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="im-merge" ${hasSer?'checked':''}> Zeilen mit gleicher Bezeichnung zu einem Artikel zusammenfassen (jede Seriennummer wird ein Einzelgerät)</label>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="im-upd" checked> Vorhandene Artikel (gleiche Bezeichnung oder Inv.-Nr.) aktualisieren statt doppelt anlegen</label>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="im-keep"> Bei vorhandenen Artikeln meine Preise behalten</label>
+    <h2 style="margin-top:12px">Vorschau</h2>
+    <div class="tw"><table><thead><tr><th>Bezeichnung</th><th>Gruppe</th><th>Untergruppe</th><th>Hersteller</th><th class="n">Bestand</th><th class="n">Preis</th><th>SN</th></tr></thead>
+    <tbody>${rows.slice(0,8).map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.category??'')}</td><td>${esc(r.subcategory??'')}</td><td>${esc(r.manufacturer??'')}</td><td class="n">${esc(r.stock??'')}</td><td class="n">${esc(r.price??'')}</td><td>${esc(r.serial??'')}</td></tr>`).join('')}</tbody></table></div>
+    <div class="row" style="margin-top:10px"><button class="b" onclick="closeModal()">Abbrechen</button><span style="flex:1"></span><button class="b p" id="im-go">${rows.length} Zeilen importieren</button></div>`);
+  if($('im-sheet'))$('im-sheet').onchange=e=>impSheet(+e.target.value);
+  document.querySelectorAll('#modal select[data-k]').forEach(sel=>sel.onchange=()=>{const v=+sel.value;Object.keys(IMP.map).forEach(k=>{if(IMP.map[k]===v&&v>=0)IMP.map[k]=-1;});IMP.map[sel.dataset.k]=v;
+    const keep=[$('im-merge').checked,$('im-upd').checked,$('im-keep').checked];impRender();[$('im-merge').checked,$('im-upd').checked,$('im-keep').checked]=keep;});
+  $('im-go').onclick=async()=>{if(!(IMP.map.name>=0))return toast('Bitte die Spalte für die Bezeichnung wählen');
+    S.importMaps[IMP.sig]={...IMP.map};
+    const r=await api('/articles/import2','POST',{rows:impRows(),merge:$('im-merge').checked,update:$('im-upd').checked,keepPrice:$('im-keep').checked});
+    closeModal();await loadArticles();
+    modal(`<h2>Import fertig</h2><p><b>${r.created}</b> Artikel neu, <b>${r.updated}</b> aktualisiert${r.units?`, <b>${r.units}</b> Einzelgeräte mit Seriennummer`:''}.${r.skipped?` ${r.skipped} Zeilen ohne Bezeichnung übersprungen.`:''}</p>
+      <p class="mut">Nächste Schritte: Cases und Zubehör unter Artikel → Verknüpfungen anlegen, dann „Kabelplan: automatisch zuordnen“.</p>
+      <div class="row"><span style="flex:1"></span><button class="b" onclick="closeModal();kpAutomap()">Kabelplan zuordnen</button><button class="b p" onclick="closeModal()">OK</button></div>`);};
+}
 
 // ---- Jobs
 async function loadJobs(){
@@ -594,36 +733,89 @@ async function openJob(id){
   if (!ARTS.length) await loadArticles();
   JOB = await api('/jobs/'+id);
   $('joblist').classList.add('hide'); $('jobdetail').classList.remove('hide');
-  ['name','customer','location','notes','factor'].forEach(k => $('j-'+k).value = JOB[k] ?? '');
+  ['name','customer','location','notes','factor','discount'].forEach(k => $('j-'+k).value = JOB[k] ?? '');
   $('j-start').value = JOB.start_date || ''; $('j-end').value = JOB.end_date || '';
-  renderPositions();
+  renderPositions(); CATALOG = await api(`/jobs/${id}/catalog`); renderCatalog();
 }
 function renderPositions(){
+  const kids={};JOB.positions.forEach(p=>{if(p.parent_pos_id!=null)kids[p.parent_pos_id]=1;});
   $('pos-tb').innerHTML = JOB.positions.map(p => {
     const w = p.warning ? `<span class="warn">⚠ benötigt ${fnum(p.warning.need)}, frei ${fnum(p.warning.free)} von ${p.warning.stock}</span>` : '';
     const pad = p.depth ? `padding-left:${8+p.depth*16}px` : '';
     return `<tr class="${p.depth?'sub':''} ${p.warning?'bad':''}">
       <td style="${pad}">${p.depth?'↳ ':''}${esc(p.name)}${p.source==='kabelplan'?' <span class="pill">Kabelplan</span>':''}${w}</td>
       <td class="n"><input type="number" step="1" inputmode="decimal" value="${p.qty}" onchange="upd(${p.id},{qty:+this.value})"></td>
-      <td class="n">${p.included ? '<span class="pill" title="Tippen zum Verrechnen" style="cursor:pointer" onclick="upd('+p.id+',{included:false})">inkl.</span>'
+      <td class="n">${p.included ? '<span class="pill" title="Tippen zum Verrechnen" style="cursor:pointer" onclick="upd('+p.id+',{included:false})">0 €</span>'
         : `<input type="number" step="0.01" inputmode="decimal" value="${p.price}" onchange="upd(${p.id},{price:+this.value})">`}</td>
       <td class="n"><input type="number" step="0.1" inputmode="decimal" value="${p.factor ?? ''}" placeholder="${fnum(JOB.factor)}" onchange="this.value===''?upd(${p.id},{clear_factor:true}):upd(${p.id},{factor:+this.value})"></td>
       <td class="n"><input type="number" step="1" inputmode="decimal" value="${p.discount||0}" onchange="upd(${p.id},{discount:+this.value})"></td>
       <td class="n">${p.included ? '–' : eur(p.total)}</td>
-      <td class="n"><button class="x" title="Entfernen" onclick="delPos(${p.id})">×</button></td></tr>`;
+      <td class="n" style="white-space:nowrap"><button class="z ${p.included?'on':''}" title="${p.included?'Wieder verrechnen':'Gebucht lassen, aber nicht verrechnen'}" onclick="upd(${p.id},{included:${!p.included}})">0 €</button>${p.parent_pos_id!=null?` <button class="z" title="Nur diese Position verrechnen, Rest im Case/Set 0 €" onclick="onlyThis(${p.id})">nur das</button>`:kids[p.id]?` <button class="z" title="Nur diese Position verrechnen, alles darunter 0 €" onclick="onlyBill(${p.id})">nur das</button>`:''} <button class="x" title="Entfernen" onclick="delPos(${p.id})">×</button></td></tr>`;
   }).join('') || '<tr><td colspan="7" class="mut">Noch kein Material gebucht.</td></tr>';
-  $('j-total').textContent = 'Summe netto ' + eur(JOB.total);
+  $('j-total').innerHTML = (JOB.discount ? `<span>Zwischensumme</span><span>${eur(JOB.subtotal)}</span><span>Rabatt ${fnum(JOB.discount)} %</span><span>− ${eur(JOB.discount_amount)}</span>` : '')
+    + `<span class="g">Summe netto</span><span class="g">${eur(JOB.total)}</span>`;
   $('j-warn').innerHTML = JOB.warning_count ? `<span class="pill w">⚠ ${JOB.warning_count} Artikel überbucht im Zeitraum</span>` : '';
 }
 async function saveJob(){
   await api('/jobs/'+JOB.id,'PUT',{name:$('j-name').value, customer:$('j-customer').value, location:$('j-location').value,
-    notes:$('j-notes').value, start_date:$('j-start').value||null, end_date:$('j-end').value||null, factor:parseFloat($('j-factor').value)||1});
+    notes:$('j-notes').value, start_date:$('j-start').value||null, end_date:$('j-end').value||null, factor:parseFloat($('j-factor').value)||1, discount:parseFloat($('j-discount').value)||0});
   toast('Gespeichert'); openJob(JOB.id);
 }
-async function addArticle(){
-  const a = findArt($('add-art').value); if (!a) return toast('Artikel nicht gefunden');
-  await api(`/jobs/${JOB.id}/positions`,'POST',{article_id:a.id, qty:parseFloat($('add-qty').value)||1});
-  $('add-art').value=''; $('add-qty').value=1; openJob(JOB.id);
+// Katalog nach Gruppen / Untergruppen
+let CATALOG=[], CAT={g:'',s:''};
+function renderCatalog(){
+  const q=$('cat-q').value.trim().toLowerCase();
+  const groups=[...new Set(CATALOG.map(a=>a.category||'Ohne Gruppe'))].sort((a,b)=>a.localeCompare(b,'de'));
+  if(CAT.g&&!groups.includes(CAT.g))CAT={g:'',s:''};
+  $('cat-chips').innerHTML=[['','Alle'],...groups.map(g=>[g,g])].map(([v,l])=>`<button class="chip ${CAT.g===v?'on':''}" data-g="${esc(v)}">${esc(l)}</button>`).join('');
+  $('cat-chips').querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{CAT={g:b.dataset.g,s:''};renderCatalog();});
+  const inG=CATALOG.filter(a=>!CAT.g||(a.category||'Ohne Gruppe')===CAT.g);
+  const subs=CAT.g?[...new Set(inG.map(a=>a.subcategory).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'de')):[];
+  $('cat-sub').innerHTML=subs.length?[['','Alle '+CAT.g],...subs.map(x=>[x,x])].map(([v,l])=>`<button class="chip s ${CAT.s===v?'on':''}" data-s="${esc(v)}">${esc(l)}</button>`).join(''):'';
+  $('cat-sub').querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{CAT.s=b.dataset.s;renderCatalog();});
+  const list=inG.filter(a=>(!CAT.s||a.subcategory===CAT.s)&&(!q||[a.name,a.manufacturer,a.category,a.subcategory,a.inv_no].join(' ').toLowerCase().includes(q)));
+  $('cat-tb').innerHTML=list.slice(0,300).map(a=>{const nc=a.contents.filter(c=>c.kind==='verbaut').length;
+    return `<tr><td>${esc(a.name)}${a.manufacturer?` <span class="mut">${esc(a.manufacturer)}</span>`:''}
+      ${nc?`<span class="mut" style="display:block;font-size:12px">Case mit ${a.contents.filter(c=>c.kind==='verbaut').map(c=>esc(c.name)).join(', ')}</span>`:''}
+      ${a.cases.length?`<span class="mut" style="display:block;font-size:12px">verbaut in ${a.cases.map(c=>esc(c.name)).join(', ')}</span>`:''}
+      ${!CAT.g&&a.category?`<span class="mut" style="display:block;font-size:12px">${esc(a.category)}${a.subcategory?' › '+esc(a.subcategory):''}</span>`:''}</td>
+      <td class="n" style="font-weight:600;color:${a.free<=0?'var(--warn)':'var(--ok)'}">${fnum(a.free)}${a.in_job?`<span class="mut" style="display:block;font-weight:400;font-size:11px">${fnum(a.in_job)} im Job</span>`:''}</td>
+      <td class="n">${eur(a.price)}</td>
+      <td class="n"><input type="number" id="cq-${a.id}" value="1" min="1" step="1" inputmode="numeric" style="width:58px"></td>
+      <td class="n"><button class="add" title="Buchen" onclick="bookArticle(${a.id})">+</button></td></tr>`;}).join('')
+    || '<tr><td colspan="5" class="mut">Nichts gefunden.</td></tr>';
+}
+async function bookArticle(id){
+  const a=CATALOG.find(x=>x.id===id);const qty=parseFloat($('cq-'+id).value)||1;
+  if(a.cases.length)return caseChoice(a,qty);
+  await api(`/jobs/${JOB.id}/positions`,'POST',{article_id:id,qty});toast(`${fnum(qty)}× ${a.name} gebucht`);openJob(JOB.id);
+}
+function caseChoice(a,qty){
+  const cs=a.cases.map(c=>CATALOG.find(x=>x.id===c.id)).filter(Boolean);
+  const firstFree=cs.findIndex(c=>c.free>=qty);const def=firstFree>=0?firstFree:0;
+  modal(`<h2>${esc(a.name)} ist in einem Case verbaut</h2>
+    <p class="mut">Soll das ganze Case mit allem Inhalt gebucht werden?</p>
+    ${cs.map((c,i)=>`<label class="opt"><input type="radio" name="cc" value="${c.id}" ${i===def?'checked':''}><span><b>${esc(c.name)}</b> komplett <span class="pill ${c.free<qty?'w':''}">frei ${fnum(c.free)}</span>
+      <span class="mut" style="display:block;font-size:13px">${c.contents.map(x=>`${fnum(x.qty)}× ${esc(x.name)}${x.kind==='zubehoer'?' (Zubehör)':''}`).join(' · ')}</span></span></label>`).join('')}
+    <label class="opt"><input type="radio" name="cc" value="0"><span><b>Nur ${esc(a.name)}</b>, ohne Case <span class="pill ${a.free<qty?'w':''}">frei ${fnum(a.free)}</span></span></label>
+    <label style="display:flex;gap:8px;align-items:center;margin:10px 0"><input type="checkbox" id="cc-only"> Nur ${esc(a.name)} verrechnen – Case und übriger Inhalt mit 0 €</label>
+    <div class="row"><button class="b" onclick="closeModal()">Abbrechen</button><span style="flex:1"></span><button class="b p" id="cc-go">${fnum(qty)}× buchen</button></div>`);
+  $('cc-go').onclick=async()=>{const v=+document.querySelector('input[name=cc]:checked').value;const only=$('cc-only').checked;closeModal();
+    if(!v)await api(`/jobs/${JOB.id}/positions`,'POST',{article_id:a.id,qty});
+    else await api(`/jobs/${JOB.id}/positions`,'POST',{article_id:v,qty,bill_only:only?a.id:null});
+    toast('Gebucht');openJob(JOB.id);};
+}
+async function onlyBill(pid){ // Elternposition: nur diese verrechnen, alles darunter 0 €
+  const ids=[];const walk=id=>JOB.positions.filter(c=>c.parent_pos_id===id).forEach(c=>{ids.push(c.id);walk(c.id);});walk(pid);
+  for(const id of ids)await api('/positions/'+id,'PUT',{included:true});
+  await api('/positions/'+pid,'PUT',{included:false});openJob(JOB.id);
+}
+async function onlyThis(pid){ // Kind: nur diese Position im Case verrechnen
+  let root=JOB.positions.find(p=>p.id===pid);while(root.parent_pos_id!=null)root=JOB.positions.find(p=>p.id===root.parent_pos_id);
+  const keep=new Set([pid]);const sub=id=>JOB.positions.filter(c=>c.parent_pos_id===id).forEach(c=>{keep.add(c.id);sub(c.id);});sub(pid);
+  const all=[root.id];const walk=id=>JOB.positions.filter(c=>c.parent_pos_id===id).forEach(c=>{all.push(c.id);walk(c.id);});walk(root.id);
+  for(const id of all){const p=JOB.positions.find(x=>x.id===id);if(keep.has(id)){if(id===pid&&p.included)await api('/positions/'+id,'PUT',{included:false});}else if(!p.included)await api('/positions/'+id,'PUT',{included:true});}
+  toast('Nur '+JOB.positions.find(p=>p.id===pid).name+' wird verrechnet');openJob(JOB.id);
 }
 async function addFree(){
   await api(`/jobs/${JOB.id}/positions`,'POST',{name:$('fp-name').value, qty:parseFloat($('fp-qty').value)||1, price:parseFloat($('fp-price').value)||0});
@@ -634,14 +826,13 @@ async function delPos(id){await api('/positions/'+id,'DELETE'); openJob(JOB.id)}
 async function copyJob(){const r = await api(`/jobs/${JOB.id}/copy`,'POST'); toast('Kopiert'); openJob(r.id)}
 async function deleteJob(){if(!confirm('Job löschen?'))return; await api('/jobs/'+JOB.id,'DELETE'); closeJob()}
 function closeJob(){JOB=null; $('jobdetail').classList.add('hide'); $('joblist').classList.remove('hide'); loadJobs()}
-$('add-art').addEventListener('keydown', e => e.key==='Enter' && addArticle());
 
 // ---- Lagerstand
 async function loadStock(){
   const s=$('s-start').value, e=$('s-end').value;
   const arts = s ? await api(`/availability?start=${s}${e?'&end='+e:''}`) : (await api('/articles')).map(a=>({...a,booked:0,free:a.stock}));
   $('stock-tb').innerHTML = arts.map(a => `<tr class="${a.free<0?'bad':''}">
-    <td class="mut">${esc(a.category)}</td><td>${esc(a.name)}</td><td class="n">${a.stock}</td>
+    <td class="mut">${esc(a.category)}${a.subcategory?' › '+esc(a.subcategory):''}</td><td>${esc(a.name)}</td><td class="n">${a.stock}</td>
     <td class="n">${s?fnum(a.booked):'–'}</td><td class="n" style="font-weight:600;color:${a.free<0?'var(--warn)':a.free===0?'var(--mut)':'var(--ok)'}">${fnum(a.free)}</td></tr>`).join('')
     || '<tr><td colspan="5" class="mut">Noch keine Artikel.</td></tr>';
 }
@@ -660,12 +851,15 @@ async function exportJob(){
   r++;headRow(ws,r,['Pos','Kategorie','Bezeichnung','Menge','Preis/Tag','Faktor','Rabatt %','Summe']);const first=r+1;let mn=0,sn=0;
   job.positions.forEach(p=>{r++;let pos;if(p.depth===0){mn++;sn=0;pos=String(mn);}else{sn++;pos=`${mn}.${sn}`;}
     const name=(p.depth?'    '.repeat(p.depth)+'↳ ':'')+p.name;
-    [pos,p.category||'',name,p.qty,p.price,p.eff_factor,p.discount||0].forEach((v,i)=>ws.getCell(r,i+1).value=v);
-    if(p.included){ws.getCell(r,8).value='inkl.';ws.getCell(r,8).alignment={horizontal:'right'};}else ws.getCell(r,8).value={formula:`D${r}*E${r}*F${r}*(1-G${r}/100)`,result:p.total};
+    [pos,p.category||'',name,p.qty,p.included?0:p.price,p.eff_factor,p.discount||0].forEach((v,i)=>ws.getCell(r,i+1).value=v);
+    if(p.included){ws.getCell(r,8).value=0;ws.getCell(r,8).alignment={horizontal:'right'};}else ws.getCell(r,8).value={formula:`D${r}*E${r}*F${r}*(1-G${r}/100)`,result:p.total};
     ws.getCell(r,5).numFmt=EURF;ws.getCell(r,8).numFmt=EURF;
     for(let i=1;i<=8;i++){ws.getCell(r,i).border=thin;if(p.depth)ws.getCell(r,i).font={color:{argb:'FF555555'}};}});
-  const last=r;r+=2;ws.getCell(r,7).value='Summe netto';ws.getCell(r,7).font={bold:true};
-  const t=ws.getCell(r,8);t.value=last>=first?{formula:`SUM(H${first}:H${last})`,result:job.total}:0;t.font={bold:true};t.numFmt=EURF;
+  const last=r;r+=2;const sumF=last>=first?{formula:`SUM(H${first}:H${last})`,result:job.subtotal}:0;
+  if(job.discount){ws.getCell(r,7).value='Zwischensumme';ws.getCell(r,8).value=sumF;ws.getCell(r,8).numFmt=EURF;const zr=r;r++;
+    ws.getCell(r,6).value='Rabatt %';ws.getCell(r,7).value=job.discount;ws.getCell(r,8).value={formula:`-H${zr}*G${r}/100`,result:-job.discount_amount};ws.getCell(r,8).numFmt=EURF;const rr=r;r++;
+    ws.getCell(r,7).value='Summe netto';ws.getCell(r,7).font={bold:true};const t=ws.getCell(r,8);t.value={formula:`H${zr}+H${rr}`,result:job.total};t.font={bold:true};t.numFmt=EURF;}
+  else{ws.getCell(r,7).value='Summe netto';ws.getCell(r,7).font={bold:true};const t=ws.getCell(r,8);t.value=sumF;t.font={bold:true};t.numFmt=EURF;}
   [6,16,42,8,12,8,10,14].forEach((w,i)=>ws.getColumn(i+1).width=w);ws.views=[{state:'frozen',ySplit:first-1}];
   await xlsxSave(wb,safeName(job.name)+'.xlsx');
 }
@@ -684,7 +878,7 @@ async function exportInventory(){
   let grand=0;
   cats.forEach(([cat,items])=>{const start=r+1;let sq=0,sv=0;
     items.forEach(a=>{const us=units[a.id];const lines=us?us.map(u=>[u.inv_no||a.inv_no,u.serial,u.purchase_date||a.purchase_date,1,u.value!=null?u.value:a.value,u.notes]):[[a.inv_no,'',a.purchase_date,a.stock,a.value,a.notes]];
-      lines.forEach(([inv,sn,pd,qty,val,note])=>{r++;[inv,a.category,a.manufacturer,a.name,sn,dat(pd),qty,val||0].forEach((v,i)=>ws.getCell(r,i+1).value=v);
+      lines.forEach(([inv,sn,pd,qty,val,note])=>{r++;[inv,a.category+(a.subcategory?' › '+a.subcategory:''),a.manufacturer,a.name,sn,dat(pd),qty,val||0].forEach((v,i)=>ws.getCell(r,i+1).value=v);
         ws.getCell(r,9).value={formula:`G${r}*H${r}`,result:qty*(val||0)};ws.getCell(r,10).value=note;ws.getCell(r,8).numFmt=EURF;ws.getCell(r,9).numFmt=EURF;
         for(let i=1;i<=10;i++)ws.getCell(r,i).border=thin;sq+=qty;sv+=qty*(val||0);});});
     r++;ws.getCell(r,4).value='Summe '+(cat||'ohne Kategorie');ws.getCell(r,7).value={formula:`SUM(G${start}:G${r-1})`,result:sq};
