@@ -1769,7 +1769,7 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
       };
       const pagesForDeck = deckCfg.pages.map((p, i) => ({ number: pageNo + i, title: p.title || autoTitle(p) }));
       const hasDial = ["plus", "plus-xl"].includes(deckCfg.deckType);
-      const pageNav = deckCfg.pageNav || (hasDial ? "dial" : deckCfg.swipe ?? false ? "swipe" : "keys");
+      const pageNav = deckCfg.pageNav || (hasDial ? "swipe" : deckCfg.swipe ?? false ? "swipe" : "keys");
       const dialNav = hasDial && pageNav === "dial" && pagesForDeck.length > 1;
       const swipe = pageNav === "swipe" || dialNav;
       const slots = navSlots(deckCfg.deckType, pagesForDeck.length, swipe && (dialNav || DECKS[deckCfg.deckType].lcd.length > 0) && deckCfg.deckType !== "neo");
@@ -2571,7 +2571,8 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
       </div>
     </div>
     ${["plus", "plus-xl"].includes(deck.deckType) ? `<label class="f" style="margin:4px 0 6px;max-width:520px">Seitenwechsel<select name="pageNav">
-      ${[["dial", "Drehregler rechts außen (drehen = Seite vor/zurück, drücken = erste Seite)"], ["swipe", "Wischen über den LCD-Streifen (in Companion „Horizontal Swipe Changes Page“ einschalten)"], ["keys", "Tasten"]].map(([k, n]) => `<option value="${k}" ${(deck.pageNav || "dial") === k ? "selected" : ""}>${n}</option>`).join("")}</select></label>` : ""}
+      ${[["swipe", "Wischen über den LCD-Streifen – alle Regler bleiben frei"], ["dial", "Drehregler rechts außen (drehen = Seite vor/zurück, drücken = erste Seite)"], ["keys", "Tasten"]].map(([k, n]) => `<option value="${k}" ${(deck.pageNav || "swipe") === k ? "selected" : ""}>${n}</option>`).join("")}</select></label>
+    ${(deck.pageNav || "swipe") === "swipe" ? `<p class="hint" style="margin:0 0 6px">In Companion einmal einschalten: <b>Surfaces</b> → dieses Stream Deck → Einstellungen (Zahnrad) → <b>„Horizontal Swipe Changes Page“</b>. Wisch nach links = nächste Seite, nach rechts = vorige.</p>` : ""}` : ""}
     <small class="muted">${d.keys.length} Tasten · ${d.encoders.length} Drehregler${d.lcd.length ? " · LCD-Streifen" : ""}${d.noDisplay ? " · ohne Display" : ""}${d.aliases.length ? ` · gilt auch für: ${d.aliases.join(", ")}` : ""}</small>
     ${deck.pages.map(pageRow).join("")}
   </div>`;
