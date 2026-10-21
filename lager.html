@@ -225,7 +225,11 @@ button.add{font:inherit;font-weight:700;border:0;background:var(--acc);color:#ff
     </div>
   </div>
   <div class="card">
-    <input id="a-filter" placeholder="Filtern…" style="width:100%;margin-bottom:8px" oninput="renderArticles()">
+    <div class="row" style="margin-bottom:8px"><input id="a-filter" placeholder="Filtern: Name, Gruppe, Hersteller, Nummer …" style="flex:1" oninput="renderArticles()"><button class="b" id="sel-btn" onclick="toggleSel()">Auswählen</button></div>
+    <div id="sel-bar" class="row hide" style="margin-bottom:8px;padding:8px;border:1px solid var(--line);border-radius:8px">
+      <span class="mut" id="sel-n" style="align-self:center">0 gewählt</span>
+      <label>Gruppe<input id="sel-cat" list="cat-dl"></label><label>Untergruppe<input id="sel-sub" list="sub-dl"></label>
+      <button class="b p" onclick="bulkSet()">Für Auswahl setzen</button><button class="b" onclick="selAll()">Alle gefilterten</button></div>
     <div class="tw"><table>
       <thead><tr><th>Gruppe</th><th>Artikel</th><th class="n">Bestand</th><th class="n">Preis/Tag</th><th></th></tr></thead>
       <tbody id="art-tb"></tbody>
@@ -441,8 +445,46 @@ function toDate(v){if(v==null||v==='')return null;if(typeof v==='number'&&v>2000
   v=String(v).trim();let m=v.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return m[0];m=v.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
   if(m){let y=+m[3];if(y<100)y+=2000;return`${y}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;}return null;}
 const numv=(v,d=0)=>typeof v==='number'?v:num(v,d);
+const BRANDS=['Allen & Heath','Amaran','Aputure','Waterbird System','Barco','Fujitsu','Apple','Magewell','Netgear','Decimator Design','Blackmagic Design','Elgato','ASUS','MSI','Radial Engineering',
+ 'Cameo','Gravity','Marshall Electronics','Wolfmix','Ape Labs','Manfrotto','QSC','Lenovo','Wentex','Panasonic','Canon','Shure','Acer','Sony','Roland','Yamaha','Sennheiser','Analog Way','Brompton','NovaStar',
+ 'Lilliput','AJA','Teradek','LiveU','Dell','HP','Ubiquiti','Cisco','Neumann','DPA','Behringer','Midas','RCF','d&b','Martin','Robe','Chauvet','Showtec','Eurolite','Velvet','Litepanels','Godox','Sachtler','Vinten','Matrox','Datavideo','Atomos'];
+const BRAND_ALIAS={'ms xl':'Waterbird System','ms phoenix':'Waterbird System','ms power':'Waterbird System','ms spigot':'Waterbird System',blackmagic:'Blackmagic Design',bmd:'Blackmagic Design',decimator:'Decimator Design',waterbird:'Waterbird System',streamdeck:'Elgato','stream deck':'Elgato',macbook:'Apple','mac mini':'Apple','mac studio':'Apple',imac:'Apple',sm7:'Shure','k12':'QSC','k10':'QSC','ks118':'QSC'};
+function guessBrand(name,known){const n=' '+String(name).toLowerCase()+' ';
+  const all=[...new Set([...known,...BRANDS])].filter(Boolean).sort((a,b)=>b.length-a.length);
+  for(const b of all){const l=b.toLowerCase();if(n.startsWith(' '+l+' ')||n.includes(' '+l+' '))return b;}
+  for(const [k,v] of Object.entries(BRAND_ALIAS))if(n.includes(k))return v;return'';}
+// Gruppen-Vorschlag: erste passende Regel gewinnt
+const GROUP_RULES=[
+ [/hdmi.*(kabel|cable)|(kabel|cable).*hdmi/,'Kabel','HDMI'],[/sdi.*(kabel|cable)|bnc.*kabel/,'Kabel','SDI'],[/dmx/,'Licht','DMX & Steuerung'],
+ [/cat ?[567]|ethernet|rj45|spooky|netzwerkkabel|lwl|glasfaser/,'Netzwerk','Kabel & Adapter'],[/power\/signal cable|ms .*cable/,'Video','Kamera-Support'],
+ [/strom|schuko|kaltger|powercon|cee|verteiler.*strom/,'Strom','Kabel & Verteiler'],[/xlr.*kabel|mikrofonkabel|klinke/,'Ton','Kabel'],
+ [/dtap|v-mount|battery|akku|charging|ladestation|power supply|netzteil/,'Strom','Akkus & Netzteile'],
+ [/atem|bildmischer|kairos|regiepl|regieolatz|\bpds\b|switcher|tricaster/,'Video','Bildmischer & Regie'],
+ [/videohub|kreuzschiene|matrix|router/,'Video','Kreuzschienen'],
+ [/converter|konverter|decimator|teranex|ultra encoder|md-[lh]x/,'Video','Konverter & Encoder'],
+ [/stream ?deck|perfectcue|companion|x-keys/,'IT','Steuerung'],
+ [/vmix|cloud service|stream(ing)? |encoder|livestream/,'Video','Streaming & Software'],
+ [/smartview|monitor|pb27u|\b2[47]"|display|bildschirm/,'Video','Monitore'],
+ [/projector|projektor|beamer|leinwand/,'Video','Projektion'],
+ [/hj\d|optik|objektiv|fujinon|canon .*(ex|ias)/,'Video','Objektive'],
+ [/ak-u|aw-u|aw-he|camera|kamera|cv50\d|ptz(?! steher)/,'Video','Kameras'],
+ [/slider|waterbird|ms xl|track|spigot|ptz steher|bodenstativ|tv zapfen|phoenix/,'Video','Kamera-Support'],
+ [/sq5|sq6|mischpult|\bqu-|dlive|x32|m32/,'Ton','Mischpulte'],[/loudspeaker|lautsprecher|bassbox|\bqsc\b|\bk1[02]\b|subwoofer|monitorbox/,'Ton','Lautsprecher'],
+ [/\bsm ?7|mikrofon|shure|sennheiser|ulxd|funk/,'Ton','Mikrofone'],[/radial|di-box|\bdi\b|usb-pro/,'Ton','DI & Interfaces'],
+ [/amaran|aputure|par\b|par |lightcan|fresnel|scheinwerfer|ls ?600|ls ?300|led/,'Licht','Scheinwerfer'],[/wolfmix|ape labs connect|lichtpult/,'Licht','DMX & Steuerung'],
+ [/lichtstativ|gravity|manfrotto|stand\b|stativ|gewichtsscheibe|tellerfu/,'Licht','Stative'],
+ [/traverse|truss|sicherheitsseil|safety|verbinder|würfel|rigging/,'Rigging','Traversen & Zubehör'],
+ [/podest|steckfu|bühne/,'Bühne & Deko','Podeste'],[/pipe&drape|pipe & drape|wentex/,'Bühne & Deko','Pipe & Drape'],[/molton|vorhang/,'Bühne & Deko','Molton & Stoffe'],
+ [/stream ?deck|perfectcue|companion|x-keys/,'IT','Steuerung'],[/laptop|notebook|mac mini|macbook|t490|thinkpad|\bmsi gt|workstation(?! dock)|\bpc\b/,'IT','Rechner'],
+ [/dock|usb.*verteiler|usb hub|thunderbolt/,'IT','Zubehör'],[/switch|router|access point|wifi|wlan/,'Netzwerk','Switches & Funk'],
+ [/stapelbeh|transport|tasche|case|koffer|kiste/,'Transport','Cases & Behälter']];
+function guessGroup(name){const n=String(name).toLowerCase();for(const [re,g,sg] of GROUP_RULES)if(re.test(n))return[g,sg];return['',''];}
 function importRows(rows,opt){
-  const merge=!!opt.merge,update=!!opt.update;const res={created:0,updated:0,units:0,skipped:0};
+  if(opt.guessBrand){const known=[...new Set([...S.articles.map(a=>a.manufacturer),...rows.map(r=>String(r.manufacturer??'').trim())].filter(Boolean))];
+    rows.forEach(r=>{const m=String(r.manufacturer??'').trim();if(!m)r.manufacturer=guessBrand(r.name,known);
+      else{const b=BRANDS.find(b=>m.toLowerCase().startsWith(b.toLowerCase()+' '));if(b)r.manufacturer=b;}});}
+  if(opt.guessGroup)rows.forEach(r=>{if(!String(r.category??'').trim()){const [g,sg]=guessGroup(r.name);r.category=g;if(!String(r.subcategory??'').trim())r.subcategory=sg;}});
+  const merge=!!opt.merge,update=!!opt.update;const res={created:0,updated:0,units:0,skipped:0,dups:[]};const fresh=new Set();
   const groups=[];const gi={};
   rows.forEach(r=>{const name=String(r.name??'').trim();if(!name){res.skipped++;return;}
     const k=merge?norm(name)+'|'+norm(r.manufacturer):'#'+groups.length;if(!gi[k]){gi[k]={rows:[]};groups.push(gi[k]);}gi[k].rows.push({...r,name});});
@@ -452,15 +494,17 @@ function importRows(rows,opt){
       inv_no:ser.length?'':String(b.inv_no??'').trim(),purchase_date:ser.length?null:toDate(b.purchase_date)};
     const stock=g.rows.reduce((s,r)=>s+('stock' in r&&String(r.stock).trim()!==''?Math.round(numv(r.stock)):1),0);
     let a=null;
-    if(update){a=(f.inv_no&&S.articles.find(x=>x.inv_no&&x.inv_no===f.inv_no))||S.articles.find(x=>norm(x.name)===norm(f.name)&&(!f.manufacturer||!x.manufacturer||norm(x.manufacturer)===norm(f.manufacturer)));}
+    if(update){a=f.inv_no?S.articles.find(x=>x.inv_no&&x.inv_no===f.inv_no&&!fresh.has(x.id)):null;
+      if(!a)a=S.articles.find(x=>!fresh.has(x.id)&&norm(x.name)===norm(f.name)&&(!f.inv_no||!x.inv_no)&&(!f.manufacturer||!x.manufacturer||norm(x.manufacturer)===norm(f.manufacturer)));}
     if(a){Object.entries(f).forEach(([k,v])=>{if(v!==''&&v!=null&&!(k==='price'&&opt.keepPrice))a[k]=v;});res.updated++;}
-    else{a={id:nid('a'),...articleFields(f),stock:0};S.articles.push(a);res.created++;}
+    else{a={id:nid('a'),...articleFields(f),stock:0};S.articles.push(a);fresh.add(a.id);res.created++;}
     if(ser.length){const have=new Set(S.units.filter(u=>u.article_id===a.id).map(u=>u.serial));
       g.rows.forEach(r=>{const sn=String(r.serial??'').trim();const n=sn?1:('stock' in r&&String(r.stock).trim()!==''?Math.round(numv(r.stock)):1);
         for(let i=0;i<n;i++){if(sn&&have.has(sn))continue;S.units.push({id:nid('u'),article_id:a.id,serial:sn,inv_no:String(r.inv_no??'').trim(),purchase_date:toDate(r.purchase_date),
           value:r.value!=null&&String(r.value).trim()!==''?numv(r.value):null,notes:sn?'':String(r.notes??'').trim()});res.units++;if(sn)have.add(sn);}});
       syncStock(a.id);}
     else if(!S.units.some(u=>u.article_id===a.id))a.stock=stock;});
+  const seen={};groups.forEach(g=>{const k=norm(g.rows[0].name);if(seen[k]&&!res.dups.includes(g.rows[0].name))res.dups.push(g.rows[0].name);seen[k]=1;});
   return res;
 }
 
@@ -481,6 +525,7 @@ const routes=[
    const kind=b.kind==='verbaut'?'verbaut':'zubehoer';
    const ex=S.links.find(l=>l.parent_id===p&&l.child_id===c);if(ex){ex.qty=+b.qty||1;ex.included=b.included?1:0;ex.kind=kind;}else S.links.push({id:nid('l'),parent_id:p,child_id:c,qty:+b.qty||1,included:b.included?1:0,kind});return{ok:true};}],
  ['PUT',/^\/links\/(\d+)$/,(m,b)=>{const l=S.links.find(x=>x.id===+m[1])||err(404,'Verknüpfung nicht gefunden');if(b.qty!=null)l.qty=+b.qty||1;if(b.included!=null)l.included=b.included?1:0;if(b.kind)l.kind=b.kind;return{ok:true};}],
+ ['POST',/^\/articles\/bulk$/,(m,b)=>{let n=0;(b.ids||[]).forEach(id=>{const a=art(+id);if(!a)return;if(b.category)a.category=b.category;if(b.subcategory!=null&&(b.subcategory||b.category))a.subcategory=b.subcategory;n++;});return{n};}],
  ['POST',/^\/articles\/import2$/,(m,b)=>importRows(b.rows||[],b)],
  ['GET',/^\/jobs\/(\d+)\/catalog$/,m=>{const job=jobBy(+m[1])||err(404,'Job nicht gefunden');const other=bookedElsewhere(job.start_date,job.end_date,job.id);const mine={};
    S.positions.filter(p=>p.job_id===job.id&&p.article_id!=null).forEach(p=>mine[p.article_id]=(mine[p.article_id]||0)+p.qty);
@@ -569,14 +614,22 @@ function kpIdFrom(v){v=v.trim();if(!v)return'';const d=KP.find(d=>d.label===v)||
 function renderArticles(){
   const f = $('a-filter').value.toLowerCase();
   const inCase={},content={};S.links.forEach(l=>{if(l.kind==='verbaut'){(inCase[l.child_id]??=[]).push(l.parent_id);content[l.parent_id]=(content[l.parent_id]||0)+1;}});
-  $('art-tb').innerHTML = ARTS.filter(a => (a.name+' '+a.category+' '+a.subcategory+' '+(a.manufacturer||'')+' '+(a.inv_no||'')).toLowerCase().includes(f)).map(a => {const acc=a.link_count-(content[a.id]||0);return `
-    <tr class="click" onclick="editArticle(${a.id})">
-      <td class="mut">${esc(a.category)}${a.subcategory?`<span style="display:block;font-size:12px">${esc(a.subcategory)}</span>`:''}</td>
+  $('art-tb').innerHTML = filteredArts().map(a => {const acc=a.link_count-(content[a.id]||0);return `
+    <tr class="click" onclick="${SEL?`selTog(${a.id},!SEL.has(${a.id}))`:`editArticle(${a.id})`}">
+      <td class="mut">${SEL?`<input type="checkbox" ${SEL.has(a.id)?'checked':''} onclick="event.stopPropagation();selTog(${a.id},this.checked)" style="margin-right:6px">`:''}${esc(a.category)}${a.subcategory?`<span style="display:block;font-size:12px">${esc(a.subcategory)}</span>`:''}</td>
       <td>${esc(a.name)} ${a.kabelplan_id?`<span class="pill" title="${esc(kpLabel(a.kabelplan_id))}">Kabelplan</span>`:''} ${content[a.id]?`<span class="pill">Case · ${content[a.id]} Geräte</span>`:''} ${inCase[a.id]?`<span class="pill">im Case</span>`:''} ${acc?`<span class="pill">+${acc} Zubehör</span>`:''} ${a.unit_count?`<span class="pill">${a.unit_count} SN</span>`:''}</td>
       <td class="n">${a.stock}</td><td class="n">${eur(a.price)}</td>
       <td class="n"><button class="x" title="Löschen" onclick="event.stopPropagation();delArticle(${a.id})">×</button></td>
     </tr>`}).join('') || '<tr><td colspan="5" class="mut">Noch keine Artikel. Lege oben einen an oder importiere deine Liste (Excel/CSV).</td></tr>';
 }
+let SEL=null;
+function toggleSel(){SEL=SEL?null:new Set();$('sel-bar').classList.toggle('hide',!SEL);$('sel-btn').textContent=SEL?'Fertig':'Auswählen';renderArticles();selCount();}
+function selTog(id,on){on?SEL.add(id):SEL.delete(id);renderArticles();selCount();}
+function selCount(){if(SEL)$('sel-n').textContent=SEL.size+' gewählt';}
+function filteredArts(){const f=$('a-filter').value.toLowerCase();return ARTS.filter(a=>(a.name+' '+a.category+' '+a.subcategory+' '+(a.manufacturer||'')+' '+(a.inv_no||'')).toLowerCase().includes(f));}
+function selAll(){filteredArts().forEach(a=>SEL.add(a.id));renderArticles();selCount();}
+async function bulkSet(){if(!SEL.size)return toast('Nichts gewählt');const c=$('sel-cat').value.trim(),sc=$('sel-sub').value.trim();if(!c&&!sc)return toast('Gruppe oder Untergruppe eintragen');
+  const r=await api('/articles/bulk','POST',{ids:[...SEL],category:c,subcategory:sc});toast(r.n+' Artikel geändert');SEL=new Set();await loadArticles();selCount();}
 function findArt(name){name=name.trim().toLowerCase();if(!name)return null;return ARTS.find(a=>a.name.toLowerCase()===name)||ARTS.find(a=>a.name.toLowerCase().includes(name));}
 function resetArticleForm(){
   EDIT_ART = null;
@@ -655,7 +708,7 @@ const IMP_FIELDS=[
  ['category','Gruppe',['gruppe','kategorie','hauptgruppe','warengruppe','artikelgruppe','produktgruppe','bereich','abteilung','category','hauptkategorie']],
  ['subcategory','Untergruppe',['untergruppe','unterkategorie','subgruppe','subkategorie','unterwarengruppe','sub category']],
  ['manufacturer','Hersteller',['hersteller','marke','fabrikat','brand','manufacturer']],
- ['stock','Bestand',['bestand','menge','anzahl','stück','stueck','stk','stk.','lagerbestand','qty','quantity','gesamtbestand','eigenbestand']],
+ ['stock','Bestand',['bestand','erwartet','sollbestand','soll','menge','anzahl','stück','stueck','stk','stk.','lagerbestand','qty','quantity','gesamtbestand','eigenbestand']],
  ['price','Preis/Tag',['preis','mietpreis','tagespreis','preis/tag','preis pro tag','verleihpreis','miete','tagesmiete','vk','vk-preis','verkaufspreis','listenpreis']],
  ['value','Wert/Stk (Wiederbeschaffung)',['wiederbeschaffungswert','wbw','neuwert','anschaffungswert','anschaffungspreis','einkaufspreis','ek','ek-preis','wert','zeitwert','versicherungswert']],
  ['inv_no','Inv.-Nr.',['inventarnummer','inventar-nr','inventar-nr.','inv.-nr.','inv.-nr','inv-nr','invnr','inventarnr','artikelnummer','art.-nr.','art.-nr','artnr','artikel-nr','nummer','barcode','id']],
@@ -700,19 +753,22 @@ function impRender(){
     <label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="im-merge" ${hasSer?'checked':''}> Zeilen mit gleicher Bezeichnung zu einem Artikel zusammenfassen (jede Seriennummer wird ein Einzelgerät)</label>
     <label style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="im-upd" checked> Vorhandene Artikel (gleiche Bezeichnung oder Inv.-Nr.) aktualisieren statt doppelt anlegen</label>
     <label style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="im-keep"> Bei vorhandenen Artikeln meine Preise behalten</label>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="im-brand" checked> Fehlenden Hersteller aus dem Namen ergänzen (z. B. „Aputure LS 300X“ → Aputure)</label>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="im-group" ${IMP.map.category>=0?'':'checked'}> Fehlende Gruppe/Untergruppe vorschlagen (Video, Ton, Licht …) – danach in der Artikelliste korrigierbar</label>
     <h2 style="margin-top:12px">Vorschau</h2>
     <div class="tw"><table><thead><tr><th>Bezeichnung</th><th>Gruppe</th><th>Untergruppe</th><th>Hersteller</th><th class="n">Bestand</th><th class="n">Preis</th><th>SN</th></tr></thead>
-    <tbody>${rows.slice(0,8).map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.category??'')}</td><td>${esc(r.subcategory??'')}</td><td>${esc(r.manufacturer??'')}</td><td class="n">${esc(r.stock??'')}</td><td class="n">${esc(r.price??'')}</td><td>${esc(r.serial??'')}</td></tr>`).join('')}</tbody></table></div>
+    <tbody>${rows.slice(0,8).map(r=>{const gg=IMP.map.category>=0?[r.category,r.subcategory]:guessGroup(r.name);return`<tr><td>${esc(r.name)}</td><td>${esc(gg[0]??'')}</td><td>${esc(gg[1]??'')}</td><td>${esc(r.manufacturer??'')}</td><td class="n">${esc(r.stock??'')}</td><td class="n">${esc(r.price??'')}</td><td>${esc(r.serial??'')}</td></tr>`}).join('')}</tbody></table></div>
     <div class="row" style="margin-top:10px"><button class="b" onclick="closeModal()">Abbrechen</button><span style="flex:1"></span><button class="b p" id="im-go">${rows.length} Zeilen importieren</button></div>`);
   if($('im-sheet'))$('im-sheet').onchange=e=>impSheet(+e.target.value);
   document.querySelectorAll('#modal select[data-k]').forEach(sel=>sel.onchange=()=>{const v=+sel.value;Object.keys(IMP.map).forEach(k=>{if(IMP.map[k]===v&&v>=0)IMP.map[k]=-1;});IMP.map[sel.dataset.k]=v;
-    const keep=[$('im-merge').checked,$('im-upd').checked,$('im-keep').checked];impRender();[$('im-merge').checked,$('im-upd').checked,$('im-keep').checked]=keep;});
+    const ids=['im-merge','im-upd','im-keep','im-brand','im-group'],keep=ids.map(i=>$(i).checked);impRender();ids.forEach((i,j)=>$(i).checked=keep[j]);});
   $('im-go').onclick=async()=>{if(!(IMP.map.name>=0))return toast('Bitte die Spalte für die Bezeichnung wählen');
     S.importMaps[IMP.sig]={...IMP.map};
-    const r=await api('/articles/import2','POST',{rows:impRows(),merge:$('im-merge').checked,update:$('im-upd').checked,keepPrice:$('im-keep').checked});
+    const r=await api('/articles/import2','POST',{rows:impRows(),merge:$('im-merge').checked,update:$('im-upd').checked,keepPrice:$('im-keep').checked,guessBrand:$('im-brand').checked,guessGroup:$('im-group').checked});
     closeModal();await loadArticles();
     modal(`<h2>Import fertig</h2><p><b>${r.created}</b> Artikel neu, <b>${r.updated}</b> aktualisiert${r.units?`, <b>${r.units}</b> Einzelgeräte mit Seriennummer`:''}.${r.skipped?` ${r.skipped} Zeilen ohne Bezeichnung übersprungen.`:''}</p>
-      <p class="mut">Nächste Schritte: Cases und Zubehör unter Artikel → Verknüpfungen anlegen, dann „Kabelplan: automatisch zuordnen“.</p>
+      ${r.dups.length?`<p class="warn" style="font-size:14px">Doppelt in der Liste (verschiedene Nummern, gleicher Name) – bitte prüfen: ${r.dups.map(esc).join(', ')}</p>`:''}
+      <p class="mut">Nächste Schritte: Gruppen in der Artikelliste prüfen (mehrere auf einmal: „Auswählen“), Preise ergänzen, Cases und Zubehör unter Verknüpfungen anlegen, dann „Kabelplan: automatisch zuordnen“.</p>
       <div class="row"><span style="flex:1"></span><button class="b" onclick="closeModal();kpAutomap()">Kabelplan zuordnen</button><button class="b p" onclick="closeModal()">OK</button></div>`);};
 }
 
