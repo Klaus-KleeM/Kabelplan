@@ -1940,8 +1940,11 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
         const c = { type: t, name: d.label || d.name, model: [d.mfr, d.name].filter(Boolean).join(" "), ip: ipOf(d), sourceId: `kp:${d.id}`, params: {}, notes: [] };
         if (t === "ptz") {
           camNo++;
-          c.params.title = `CAM ${camNo}`;
-          c.label = `cam${camNo}`;
+          const lbl = String(d.label || d.name || "");
+          const num = (lbl.match(/#\s*(\d+)\s*$/) || [])[1] || camNo;
+          const model = String(d.name || "").replace(/^AW-/i, "");
+          c.params.title = `${model} #${num}`.slice(0, 12);
+          c.label = cleanLabel(`${model}_${num}`).toLowerCase();
           for (const p of d.ports || []) {
             if (!p.peer || !isVideoOut(p)) continue;
             const peer = byId[p.peer.deviceId];
@@ -1972,15 +1975,16 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
         }
         out.push(c);
       }
-      for (const sw of d.software || []) {
-        const st = classify(sw);
-        if (!["vmix", "qlab", "mitti", "ppt", "timer"].includes(st)) continue;
-        out.push({ type: st, name: `${sw} – ${d.label}`, model: sw, ip: ipOf(d), sourceId: `kp:${d.id}:${sw}`, params: {}, notes: [`auf ${d.label}`] });
-      }
+      // Software auf Rechnern wird im Dialog pro Rechner angeboten (siehe pcs)
     }
     for (const c of out) if (!c.ip) c.notes.push("keine IP im Kabelplan");
+    out.pcs = devs.filter((d) => /Computer|Medienserver/.test(d.group || "") || d.os || (d.software || []).length).map((d) => ({
+      id: d.id, label: d.label || d.name, os: d.os || "", ip: ipOf(d),
+      sw: (d.software || []).map(classify).filter((t) => SW_TYPES.includes(t))
+    }));
     return out;
   }
+  var SW_TYPES = ["vmix", "qlab", "mitti", "ppt", "timer"];
   function classify(text) {
     for (const r of RULES) if (r.re.test(text)) return r.type;
     return null;
@@ -2152,8 +2156,10 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
     const dlg = $("#dlg");
     $("#dlgBody").innerHTML = html;
     dlg.showModal();
+    let last = null;
+    $("#dlgBody").querySelectorAll("button[value]").forEach((b) => b.addEventListener("click", () => last = b));
     $("#dlgBody").onsubmit = (e) => {
-      const btn = e.submitter;
+      const btn = e.submitter || last;
       if (btn && btn.value === "ok" && onSubmit) {
         if (onSubmit(new FormData($("#dlgBody"))) === false) e.preventDefault();
       }
@@ -2322,13 +2328,15 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
     let bridge = readBridge();
     let planId = bridge?.current;
     let list = [];
+    let pcs = [];
     const fallback = () => scanLocalStorage().flatMap((f) => f.devices.map((d) => ({ ...d, params: {}, notes: [`aus ${f.key}`] })));
     let compute = () => {
       if (bridge) {
         const plan = bridge.plans.find((x) => x.id === planId) || bridge.plans[0];
         planId = plan?.id;
         list = plan ? bridgeCandidates(plan) : [];
-      } else list = fallback();
+        pcs = list.pcs || [];
+      } else (list = fallback(), pcs = []);
     };
     const known = (c) => P().devices.some((d) => d.sourceId && d.sourceId === c.sourceId);
     const renderBody = () => {
@@ -2337,8 +2345,14 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
          <small class="muted">Stand Kabelplan: ${esc(new Date(bridge.updated).toLocaleString("de-AT"))}</small>` : `<p class="muted">Keine Kabelplan-Schnittstelle gefunden (Kabelplan ab Version 2.2 unter derselben Adresse öffnen) – zeige allgemeine Suche im Browser-Speicher.</p>`;
       const body = list.length ? `<div class="kp-list">${list.map(
         (d, i) => `<label><input type="checkbox" name="d${i}" checked> <span><strong>${esc(d.label ? d.params.title || d.label : d.name)}</strong> ${known(d) ? '<span class="pill kp">aktualisieren</span>' : '<span class="pill">neu</span>'}<br><small>${esc(DEVICE_TYPES[d.type].name)}${d.ip ? " · " + esc(d.ip) : ""}${d.model && d.model !== DEVICE_TYPES[d.type].name ? " · " + esc(d.model) : ""}${d.notes?.length ? " · " + esc(d.notes.join(" · ")) : ""}</small></span></label>`
-      ).join("")}</div>` : `<p class="muted">Keine passenden Geräte gefunden. Erkannt werden ATEM, Kairos, Videohub, Panasonic-PTZ, AW-RP150/RP200 sowie vMix, QLab, Mitti, PowerPoint und Countdown Timer als Software auf Rechnern.</p>`;
-      $("#kpBody").innerHTML = head + body;
+      ).join("")}</div>` : `<p class="muted">Keine Geräte zum Steuern gefunden (ATEM, Kairos, Videohub, Panasonic-PTZ, AW-RP150/RP200).</p>`;
+      const osName = { mac: "macOS", win: "Windows", linux: "Linux" };
+      const swOk = (t, os) => !os || !(t === "vmix" && os !== "win") && !(t === "qlab" && os !== "mac");
+      const pcHtml = pcs.length ? `<h3 style="margin:14px 0 4px">Rechner – welche Show-Software soll Companion steuern?</h3>
+        <p class="hint" style="margin:0 0 6px">Vorausgewählt ist, was im Kabelplan beim Rechner eingetragen ist. Hier kannst du ergänzen – dauerhaft besser im Kabelplan beim Rechner unter „Software“.</p>
+        <div class="kp-list">${pcs.map((pc, j) => `<div style="padding:8px 0;border-top:1px solid var(--line,#ddd)"><strong>${esc(pc.label)}</strong> <small class="muted">${esc(osName[pc.os] || "System unbekannt")}${pc.ip ? " · " + esc(pc.ip) : " · keine IP im Kabelplan"}</small>
+          <div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:6px">${SW_TYPES.map((t) => `<label style="display:flex;gap:6px;align-items:center;${swOk(t, pc.os) ? "" : "opacity:.45"}"><input type="checkbox" name="pc${j}_${t}" ${pc.sw.includes(t) ? "checked" : ""}> ${esc(DEVICE_TYPES[t].name)}${pc.sw.includes(t) && P().devices.some((d) => d.sourceId === `kp:${pc.id}:${t}`) ? ' <span class="pill kp">aktualisieren</span>' : ""}</label>`).join("")}</div></div>`).join("")}</div>` : (bridge ? `<p class="hint">Im Plan ist kein Rechner. Für vMix, QLab, Mitti, PowerPoint oder Countdown Timer im Kabelplan einen Rechner (z. B. MacBook Pro, Windows-Laptop) einfügen und unter „Software“ das Programm wählen.</p>` : "");
+      $("#kpBody").innerHTML = head + body + pcHtml;
       $("#kpPlan")?.addEventListener("change", (e) => {
         planId = e.target.value;
         renderBody();
@@ -2352,6 +2366,9 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
      <div class="dlg-actions"><button class="btn" value="cancel">Abbrechen</button><button class="btn primary" value="ok">Übernehmen</button></div>`,
       (fd) => {
         const chosen = list.filter((_, i) => fd.get(`d${i}`));
+        pcs.forEach((pc, j) => SW_TYPES.forEach((t) => {
+          if (fd.get(`pc${j}_${t}`)) chosen.push({ type: t, name: `${DEVICE_TYPES[t].name} – ${pc.label}`, model: DEVICE_TYPES[t].name, ip: pc.ip, sourceId: `kp:${pc.id}:${t}`, params: {}, notes: [`auf ${pc.label}`] });
+        }));
         const p = P();
         const { added, updated } = mergeDevices(chosen, p.devices);
         p.devices.push(...added);
