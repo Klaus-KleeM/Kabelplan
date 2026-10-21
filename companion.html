@@ -157,7 +157,7 @@ dialog form { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 </head>
 <body>
 <header class="top">
-  <div class="brand"><span class="logo">K</span><div><strong>Companion Builder</strong><small>KLEEM · Stream Deck → Companion 4.3+</small></div></div>
+  <div class="brand"><span class="logo">K</span><div><strong>Companion Builder</strong><small>KLEEM · Stream Deck → Companion 5.1 (ab 4.3)</small></div></div>
   <nav class="applinks"><a href="index.html">Kabelplan</a><a href="lager.html">Lager</a></nav>
   <div class="project">
     <select id="projectSelect" aria-label="Projekt"></select>
@@ -2700,6 +2700,7 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
         <label class="f" style="flex:1;min-width:200px">Dateiname<input id="expName" value="${esc(p.exportName || p.name)}" autocapitalize="off" spellcheck="false"></label>
         <button class="btn primary" id="expFull" ${pages.length ? "" : "disabled"}>⬇ <span id="expFn">${esc(cleanLabel(p.exportName || p.name))}</span>.companionconfig</button>
       </div>
+      <p class="hint" style="border-left:3px solid #f0a43a;padding-left:8px">Ziel: <b>Companion 5.1</b> (mindestens 4.3). Ältere Companion-Versionen lesen die Datei falsch ein, ohne Fehlermeldung.</p>
       <p class="hint">Am iPad öffnet sich das Teilen-Menü: „In Dateien sichern“ wählen. Die Datei endet auf <b>.companionconfig</b> – ist sie in Companion trotzdem ausgegraut, in der Dateien-App den Namen prüfen (kein „.json“ am Ende).</p>
       <p class="hint">In Companion: <b>Import / Export → Import</b> → Datei wählen → „Full Import“. Bei <b>Buttons</b> und <b>Custom Variables</b> „Reset and Import“ wählen, <b>Connections</b> auf „Unchanged“ lassen, damit bestehende Verbindungen mit gleichem Namen weiterverwendet werden. Achtung: Reset ersetzt alle Tasten der Companion-Installation.</p>
     </div>
@@ -2714,7 +2715,7 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
       <label class="f check"><input type="checkbox" id="optPin" ${p.pinModuleVersions ? "checked" : ""}> Modulversion festschreiben (sonst: neueste installierte Version)</label>
       <h3 style="margin-top:12px">Benötigte Companion-Module</h3>
       <ul>${[...new Set(used.map((d) => d.type))].map((t) => `<li><code>${DEVICE_TYPES[t].moduleId}</code> – geprüft mit v${DEVICE_TYPES[t].moduleVersion}</li>`).join("") || '<li class="muted">–</li>'}</ul>
-      <p class="hint">Erfordert Companion 4.3 oder neuer (Exportformat v12). Companion 4.0–4.2 lehnt die Datei als „zu neu“ ab.</p>
+      <p class="hint"><b>Nur für aktuelles Companion:</b> geprüft für Companion 5.1 (Oktober 2026), funktioniert ab 4.3. Ältere Versionen (3.x, 4.0–4.2) importieren die Datei <b>ohne Fehlermeldung, aber falsch</b> – Tasten fehlen oder sind leer. Version steht in Companion links unten; Update gratis unter bitfocus.io. Module: in Companion unter Connections die jeweils aktuelle Version installieren (geprüft mit den oben genannten).</p>
     </div>`;
     const fn = () => cleanLabel(p.exportName || p.name);
     $("#expName").oninput = (e) => (p.exportName = e.target.value.trim(), save(), $("#expFn").textContent = fn());
