@@ -1618,7 +1618,8 @@ ${v(dev, "pmem")}`,
       controls[r][c] = ctrl;
       meta && (report.cells = report.cells || {}, report.cells[`${r}/${c}`] = meta);
     };
-    const encSlots = deck.encoders;
+    const dial = nav && nav.dial && deck.encoders.length > 1;
+    const encSlots = dial ? deck.encoders.slice(0, -1) : deck.encoders;
     let encs = (built.encoders || []).slice();
     const prefs = options.prefs || {};
     const order = new Map(built.keys.map((k, i) => [k, i]));
@@ -1697,6 +1698,21 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
       }
       nav.slots.forEach(([r, c], i) => set(r, c, makeButton(navBtns[i]), { kind: "nav", ...navBtns[i], info: "Seitenwechsel" }));
     }
+    if (dial) {
+      const pages = nav.pages, cur = nav.current;
+      const prev = pages[(cur - 1 + pages.length) % pages.length], next = pages[(cur + 1) % pages.length];
+      const [r, c, lcd] = deck.encoders[deck.encoders.length - 1];
+      const btn = {
+        text: `◀ ▶ ${cur + 1}/${pages.length}\n${pages[cur].title}`, size: 14, bgcolor: 3158064, color: COLORS.white,
+        left: [internal.setPage(prev.number)], right: [internal.setPage(next.number)], down: [internal.setPage(pages[0].number)], rotary: true, feedbacks: []
+      };
+      const info = `Seiten: drehen = ${prev.title} ◀ / ▶ ${next.title}, drücken = erste Seite (${pages[0].title})`;
+      set(r, c, makeButton(btn), { kind: "encoder", ...btn, info, isDial: true });
+      if (lcd) {
+        const lcdBtn = { ...btn, rotary: false, left: void 0, right: void 0, bgcolor: 3158064 };
+        set(lcd[0], lcd[1], makeButton(lcdBtn), { kind: "lcd", ...lcdBtn, info, isDial: true });
+      }
+    }
     const reserved = nav ? nav.slots : [];
     const { placed, dropped } = placeKeys(deck, keyItems, reserved);
     const over = [...hidden, ...dropped].sort((a, b) => (order.get(a) ?? order.get(built.keys.find((k) => itemKey(k) === itemKey(a))) ?? 0) - (order.get(b) ?? order.get(built.keys.find((k) => itemKey(k) === itemKey(b))) ?? 0));
@@ -1752,8 +1768,11 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
         return t?.name || "Seite";
       };
       const pagesForDeck = deckCfg.pages.map((p, i) => ({ number: pageNo + i, title: p.title || autoTitle(p) }));
-      const swipe = deckCfg.swipe ?? deckCfg.deckType === "plus";
-      const slots = navSlots(deckCfg.deckType, pagesForDeck.length, swipe && DECKS[deckCfg.deckType].lcd.length > 0 && deckCfg.deckType !== "neo");
+      const hasDial = ["plus", "plus-xl"].includes(deckCfg.deckType);
+      const pageNav = deckCfg.pageNav || (hasDial ? "dial" : deckCfg.swipe ?? false ? "swipe" : "keys");
+      const dialNav = hasDial && pageNav === "dial" && pagesForDeck.length > 1;
+      const swipe = pageNav === "swipe" || dialNav;
+      const slots = navSlots(deckCfg.deckType, pagesForDeck.length, swipe && (dialNav || DECKS[deckCfg.deckType].lcd.length > 0) && deckCfg.deckType !== "neo");
       deckCfg.pages.forEach((p, i) => {
         const tpl = TEMPLATES[p.template];
         const ctx = {
@@ -1777,7 +1796,7 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
         if (missing) built = { title: pagesForDeck[i].title, keys: [], encoders: [], warning: "Kein Gerät zugewiesen" };
         else built = tpl.build(ctx);
         built.title = pagesForDeck[i].title;
-        const { page, report } = buildPage(deckCfg.deckType, built, { slots, pages: pagesForDeck, current: i }, { encodersAsKeys: project.encodersAsKeys !== false, pageNumber: pagesForDeck[i].number, prefs: p.keyPrefs || {}, listEncoder: p.listEncoder !== false });
+        const { page, report } = buildPage(deckCfg.deckType, built, { slots, pages: pagesForDeck, current: i, dial: dialNav }, { encodersAsKeys: project.encodersAsKeys !== false, pageNumber: pagesForDeck[i].number, prefs: p.keyPrefs || {}, listEncoder: p.listEncoder !== false });
         if (built.warning) report.warning = built.warning;
         out.push({ number: pagesForDeck[i].number, deckIdx, pageId: p.id, title: built.title, page, report });
       });
@@ -2460,6 +2479,7 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
         const pg = deck.pages.find((x) => x.id === f.closest("[data-page]")?.dataset.page);
         if (f.name === "deckName") deck.name = f.value;
         else if (f.name === "swipe") deck.swipe = f.checked;
+        else if (f.name === "pageNav") deck.pageNav = f.value;
         else if (f.name === "deckType") deck.deckType = f.value;
         else if (pg && f.name === "template") {
           pg.template = f.value;
@@ -2550,7 +2570,8 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
         <button class="btn danger" data-act="delDeck">Entfernen</button>
       </div>
     </div>
-    ${["plus", "plus-xl"].includes(deck.deckType) ? `<label class="f check" style="margin:4px 0 6px"><input type="checkbox" name="swipe" ${deck.swipe ?? deck.deckType === "plus" ? "checked" : ""}> Seitenwechsel per Wischen über den LCD-Streifen (spart die Navigationstaste – in Companion bei der Surface „Horizontal Swipe Changes Page“ einschalten)</label>` : ""}
+    ${["plus", "plus-xl"].includes(deck.deckType) ? `<label class="f" style="margin:4px 0 6px;max-width:520px">Seitenwechsel<select name="pageNav">
+      ${[["dial", "Drehregler rechts außen (drehen = Seite vor/zurück, drücken = erste Seite)"], ["swipe", "Wischen über den LCD-Streifen (in Companion „Horizontal Swipe Changes Page“ einschalten)"], ["keys", "Tasten"]].map(([k, n]) => `<option value="${k}" ${(deck.pageNav || "dial") === k ? "selected" : ""}>${n}</option>`).join("")}</select></label>` : ""}
     <small class="muted">${d.keys.length} Tasten · ${d.encoders.length} Drehregler${d.lcd.length ? " · LCD-Streifen" : ""}${d.noDisplay ? " · ohne Display" : ""}${d.aliases.length ? ` · gilt auch für: ${d.aliases.join(", ")}` : ""}</small>
     ${deck.pages.map(pageRow).join("")}
   </div>`;
@@ -2565,6 +2586,7 @@ ${nav.current + 1}/${pages.length}`, size: 14, color: COLORS.black, bgcolor: COL
   }
   var hex = (n) => "#" + Number(n ?? 0).toString(16).padStart(6, "0");
   function displayText(meta) {
+    if (meta.isDial) return String(meta.text).replace(/\\n/g, "\n");
     if (meta.isList) return `⟲ Blättern\n${(meta.listItems || [])[0] || ""} (1/${(meta.listItems || []).length})`;
     let t = String(meta.text ?? "");
     if (meta.textExpression) {
