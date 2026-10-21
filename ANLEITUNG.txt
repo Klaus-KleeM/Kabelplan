@@ -1,16 +1,24 @@
-KLEEM Kabelplan – Update auf Version 2.2
+KLEEM Kabelplan 2.3 + Lager + Link zum Companion Builder (iPad) – Update
 
 NEU
-- Lager-Job laden: Pläne > "Datei laden" oder "Aus Zwischenablage einfügen" – legt den Plan mit den Geräten an
-  (optional gleich mit Auto-Verkabelung) und übernimmt Lagerstückzahlen.
-- Packliste > "An Lager übergeben": Geräte, Kabel, Zubehör, Software als Datei fürs Lagerprogramm.
-- Companion-Schnittstelle: Geräte, Verbindungen und IPs werden für den Companion-Builder bereitgestellt.
-- Pläne > "Geräteliste für das Lager": alle Bibliotheks-IDs als CSV zum Zuordnen im Lager.
-- Details zu den Formaten: SCHNITTSTELLE.md
+- Das Lager läuft jetzt im selben Home-Bildschirm-App wie der Kabelplan: oben links „Lager“ bzw. „Kabelplan“ wechselt.
+  Beide laufen offline und teilen sich die Daten auf dem iPad – nichts mehr kopieren.
+- Kabelplan > Pläne > „Aus Lager übernehmen“: Lager-Job wählen → Plan mit den Geräten (+ Auto-Verkabelung).
+- Lager > Job > „Packliste aus Kabelplan“: Plan wählen → Kabel, Zubehör, Zumiete in den Job.
+- Lager: Artikel, Einzelgeräte/Seriennummern, Zubehör-Verknüpfungen, Jobs mit Faktor/Rabatt,
+  Verfügbarkeit, CSV-Import, Excel (Kalkulation, Verfügbarkeit, Inventarliste mit Formeln).
 
 UPDATE
 1. Kabelplan > Pläne > Backup erstellen.
 2. ZIP entpacken, in Safari github.com/Klaus-KleeM/Kabelplan/upload/main öffnen.
-3. Alle Dateien auswählen, "Commit changes", grünen Haken unter Actions abwarten.
-4. Kabelplan öffnen, 10 Sekunden warten, ganz schließen, wieder öffnen.
-Deine Daten bleiben unverändert.
+3. ALLE Dateien auswählen (auch lager.html und exceljs.min.js), "Commit changes",
+   grünen Haken unter Actions abwarten.
+   companion.html ist NICHT in der ZIP – die Datei im Repo bleibt einfach liegen, nicht löschen.
+4. Kabelplan-App öffnen, 10 Sekunden warten, ganz schließen, wieder öffnen.
+   Oben neben „Kabelplan“ stehen jetzt „Lager“ und „Companion“.
+Deine Kabelplan-Daten bleiben unverändert.
+
+LAGER-DATEN
+- Liegen nur auf dem iPad. Lager > Daten > „Backup erstellen“ regelmäßig, Datei auf Stick/Rechner.
+- Bestehende Artikel aus der Server-Version: dort als CSV exportieren bzw. deine Artikel-CSV
+  im Lager unter Artikel > „CSV importieren“ laden.

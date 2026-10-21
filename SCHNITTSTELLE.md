@@ -46,7 +46,7 @@ Erzeugt über Packliste → „An Lager übergeben“.
 
 ```json
 {
-  "kind": "kleem.kabelplan.export", "v": 1, "app": "2.2", "updated": "ISO-Zeit", "current": "<planId>",
+  "kind": "kleem.kabelplan.export", "v": 1, "app": "2.3", "updated": "ISO-Zeit", "current": "<planId>",
   "plans": [ {
     "id": "…", "name": "…", "format": "HD|4K", "lager": null,
     "devices": [ {
@@ -64,3 +64,18 @@ Erzeugt über Packliste → „An Lager übergeben“.
 
 - `index` ist die laufende Nummer unter gleichartigen Anschlüssen (z. B. Videohub „In 5“ → index 5) und eignet sich für Router- und Mischer-Eingänge.
 - `ip` erscheint nur, wenn eine Adresse gesetzt ist.
+
+
+## Gemeinsame Ablage am iPad (ab 2.3)
+
+Kabelplan (`index.html`) und Lager (`lager.html`) liegen unter derselben Adresse und teilen sich `localStorage`:
+
+| Schlüssel | schreibt | liest | Inhalt |
+|---|---|---|---|
+| `kleem.kabelplan.export.v1` | Kabelplan | Companion-Builder | Pläne, Geräte, Anschlüsse, Gegenstellen, IPs (Format oben) |
+| `kleem.kabelplan.library.v1` | Kabelplan | Lager | `{devices:[{id,mfr,name,grp,aliases,qty}]}` – Geräteliste fürs Zuordnen |
+| `kleem.kabelplan.packlisten.v1` | Kabelplan | Lager | `{plans:[<kleem-kabelplan-packliste>]}` – eine Packliste pro Plan |
+| `kleem.lager.export.v1` | Lager | Kabelplan | `{inventar:[{kabelplan_id,bestand}], jobs:[<kleem-lager-job>]}` – Jobs der letzten 90 Tage und künftige |
+
+Die Lagerdaten selbst liegen in IndexedDB (`kleem-lager`), die Kabelplan-Daten in `kleem-kabelplan-v1`.
+Datei- und Einfügen-Wege bleiben für die Server-Version des Lagers erhalten.

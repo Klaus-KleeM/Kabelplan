@@ -1,0 +1,798 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="KLEEM">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#15181d">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>KLEEM Lager</title>
+<style>
+:root{--bg:#f4f4f2;--card:#fff;--fg:#1b1b1b;--mut:#6b6b6b;--line:#ddd;--acc:#c8102e;--warn:#b45309;--warnbg:#fff4e0;--ok:#15803d}
+@media (prefers-color-scheme:dark){:root{--bg:#141414;--card:#1e1e1e;--fg:#eee;--mut:#9a9a9a;--line:#333;--acc:#ff4d61;--warn:#f59e0b;--warnbg:#3a2a10;--ok:#4ade80;color-scheme:dark}}
+*{box-sizing:border-box}
+html{padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;font:15px/1.4 system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--fg);-webkit-tap-highlight-color:transparent}
+header{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line);display:flex;gap:4px;align-items:center;flex-wrap:wrap;
+  padding:8px max(12px,env(safe-area-inset-right,0px)) 8px max(12px,env(safe-area-inset-left,0px))}
+header b{margin-right:auto;letter-spacing:.04em}
+header a.sw{font-size:13px;color:var(--mut);text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:6px 10px;margin-right:6px}
+nav button{background:none;border:0;padding:8px 12px;border-radius:8px;color:var(--mut);font:inherit;cursor:pointer}
+nav button.on{background:var(--fg);color:var(--bg)}
+main{max-width:1100px;margin:0 auto;padding:12px max(12px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+h2{font-size:17px;margin:0 0 10px}
+input,select,textarea{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 9px;min-width:0}
+textarea{width:100%;min-height:50px}
+button.b,label.b{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:8px;padding:7px 12px;cursor:pointer;white-space:nowrap;min-height:36px}
+button.p{background:var(--acc);border-color:var(--acc);color:#fff}
+button.x{border:0;background:none;color:var(--mut);cursor:pointer;font-size:20px;padding:2px 8px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+.row label{display:flex;flex-direction:column;font-size:12px;color:var(--mut);gap:3px;flex:1 1 140px}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:6px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-size:12px;color:var(--mut);font-weight:600}
+td.n,th.n{text-align:right;white-space:nowrap}
+td input{width:72px;padding:4px 6px}
+tr.sub td{color:var(--mut);font-size:14px}
+tr.click{cursor:pointer}tr.click:hover{background:var(--bg)}
+.warn{color:var(--warn);font-size:12px;display:block}
+tr.bad td{background:var(--warnbg)}
+.mut{color:var(--mut);font-size:13px}
+.tot{font-size:18px;font-weight:700;text-align:right;margin-top:10px}
+.pill{display:inline-block;font-size:11px;padding:1px 7px;border-radius:9px;background:var(--bg);border:1px solid var(--line);color:var(--mut)}
+.pill.w{border-color:var(--warn);color:var(--warn)}
+.hide{display:none!important}
+#toast{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:8px;opacity:0;transition:.2s;pointer-events:none;z-index:30}
+#toast.on{opacity:1}
+#modal{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px}
+#modal .dlg{background:var(--card);border:1px solid var(--line);border-radius:12px;width:min(900px,100%);max-height:100%;overflow:auto;padding:14px}
+#modal textarea{min-height:160px;font:12px ui-monospace,Menlo,monospace}
+#modal td select,#modal td input{width:100%;min-width:110px}
+</style>
+</head>
+<body>
+<header>
+  <b>KLEEM&nbsp;Lager</b>
+  <a class="sw" href="index.html">Kabelplan</a>
+  <a class="sw" href="companion.html">Companion</a>
+  <nav>
+    <button data-v="jobs" class="on">Jobs</button>
+    <button data-v="articles">Artikel</button>
+    <button data-v="stock">Lagerstand</button>
+    <button data-v="data">Daten</button>
+  </nav>
+</header>
+<main>
+
+<!-- JOBS -->
+<section id="v-jobs">
+  <div id="joblist">
+    <div class="card">
+      <h2>Neuer Job</h2>
+      <div class="row">
+        <label>Name<input id="nj-name"></label>
+        <label>Kunde<input id="nj-customer"></label>
+        <label>Von<input type="date" id="nj-start"></label>
+        <label>Bis<input type="date" id="nj-end"></label>
+        <button class="b p" onclick="createJob()">Anlegen</button>
+      </div>
+    </div>
+    <div class="card"><div class="tw"><table>
+      <thead><tr><th>Datum</th><th>Job</th><th>Kunde</th><th class="n">Summe</th></tr></thead>
+      <tbody id="jobs-tb"></tbody>
+    </table></div></div>
+  </div>
+
+  <div id="jobdetail" class="hide">
+    <div class="row" style="margin-bottom:10px">
+      <button class="b" onclick="closeJob()">← Alle Jobs</button>
+      <span style="flex:1"></span>
+      <button class="b" onclick="kpSend()">An Kabelplan senden</button>
+      <button class="b" onclick="kpPack()">Packliste aus Kabelplan</button>
+      <button class="b" onclick="copyJob()">Kopieren</button>
+      <button class="b" onclick="deleteJob()">Löschen</button>
+      <button class="b p" onclick="exportJob()">Excel</button>
+    </div>
+    <div class="card">
+      <div class="row">
+        <label style="flex:2 1 200px">Job<input id="j-name"></label>
+        <label>Kunde<input id="j-customer"></label>
+        <label>Ort<input id="j-location"></label>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label>Von<input type="date" id="j-start"></label>
+        <label>Bis<input type="date" id="j-end"></label>
+        <label style="flex:0 1 110px">Faktor<input type="number" step="0.1" id="j-factor" inputmode="decimal"></label>
+        <button class="b" onclick="saveJob()">Speichern</button>
+      </div>
+      <label class="mut" style="display:block;margin-top:8px">Notiz<textarea id="j-notes"></textarea></label>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <label style="flex:3 1 220px">Artikel buchen<input id="add-art" list="art-dl" placeholder="Suchen…"></label>
+        <label style="flex:0 1 80px">Menge<input type="number" id="add-qty" value="1" min="0" step="1" inputmode="numeric"></label>
+        <button class="b p" onclick="addArticle()">Hinzufügen</button>
+      </div>
+      <datalist id="art-dl"></datalist>
+      <details style="margin-top:8px"><summary class="mut">Freie Position (Personal, Fahrt, Zukauf …)</summary>
+        <div class="row" style="margin-top:8px">
+          <label style="flex:3 1 200px">Bezeichnung<input id="fp-name"></label>
+          <label style="flex:0 1 80px">Menge<input type="number" id="fp-qty" value="1" inputmode="decimal"></label>
+          <label style="flex:0 1 110px">Preis<input type="number" step="0.01" id="fp-price" inputmode="decimal"></label>
+          <button class="b" onclick="addFree()">Hinzufügen</button>
+        </div>
+      </details>
+    </div>
+
+    <div class="card">
+      <div id="j-warn" class="mut"></div>
+      <div class="tw"><table>
+        <thead><tr><th>Bezeichnung</th><th class="n">Menge</th><th class="n">Preis/Tag</th><th class="n">Faktor</th><th class="n">Rabatt %</th><th class="n">Summe</th><th></th></tr></thead>
+        <tbody id="pos-tb"></tbody>
+      </table></div>
+      <div class="tot" id="j-total"></div>
+      <div class="mut">Faktor leer = Job-Faktor. Menge am Hauptartikel ändert das Zubehör mit.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ARTIKEL -->
+<section id="v-articles" class="hide">
+  <div class="card">
+    <h2 id="af-title">Neuer Artikel</h2>
+    <div class="row">
+      <label style="flex:3 1 200px">Bezeichnung<input id="af-name"></label>
+      <label>Kategorie<input id="af-category" list="cat-dl"></label>
+      <label style="flex:0 1 90px">Bestand<input type="number" id="af-stock" value="1" inputmode="numeric"></label>
+      <label style="flex:0 1 110px">Preis/Tag<input type="number" step="0.01" id="af-price" value="0" inputmode="decimal"></label>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <label>Hersteller<input id="af-manufacturer"></label>
+      <label>Inv.-Nr.<input id="af-inv_no"></label>
+      <label>Kaufdatum<input type="date" id="af-purchase_date"></label>
+      <label style="flex:0 1 140px">Wiederbeschaffung/Stk<input type="number" step="0.01" id="af-value" value="0" inputmode="decimal"></label>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <label style="flex:3 1 260px">Kabelplan-Gerät <span class="mut" id="af-kp-hint"></span><input id="af-kp" list="kp-dl" placeholder="Leer = kein Gerät im Kabelplan (z. B. Kabel, Zubehör)"></label>
+    </div>
+    <datalist id="kp-dl"></datalist>
+    <label class="mut" style="display:block;margin-top:8px">Notiz / Seriennummern<input id="af-notes" style="width:100%"></label>
+    <div class="row" style="margin-top:8px">
+      <button class="b p" onclick="saveArticle()">Speichern</button>
+      <button class="b hide" id="af-cancel" onclick="resetArticleForm()">Abbrechen</button>
+      <span style="flex:1"></span>
+      <label class="b" style="flex:0 0 auto">CSV importieren<input type="file" accept=".csv,.txt,text/csv,text/plain" class="hide" onchange="importCsv(this)"></label>
+      <button class="b" onclick="kpAutomap()">Kabelplan: automatisch zuordnen</button>
+    </div>
+    <datalist id="cat-dl"></datalist>
+
+    <div id="units-box" class="hide" style="margin-top:14px;border-top:1px solid var(--line);padding-top:10px">
+      <h2>Einzelgeräte <span class="mut" style="font-weight:400;font-size:13px">– optional; wenn erfasst, ist Bestand = Anzahl Geräte</span></h2>
+      <div class="tw"><table>
+        <thead><tr><th>Seriennummer</th><th>Inv.-Nr.</th><th>Kaufdatum</th><th class="n">Wert</th><th>Notiz</th><th></th></tr></thead>
+        <tbody id="units-tb"></tbody>
+      </table></div>
+      <div class="row" style="margin-top:8px">
+        <label>Seriennummer<input id="un-serial"></label>
+        <label>Inv.-Nr.<input id="un-inv_no"></label>
+        <label>Kaufdatum<input type="date" id="un-purchase_date"></label>
+        <label style="flex:0 1 110px">Wert<input type="number" step="0.01" id="un-value" placeholder="= Artikel" inputmode="decimal"></label>
+        <label>Notiz<input id="un-notes"></label>
+        <button class="b" onclick="addUnit()">Gerät hinzufügen</button>
+      </div>
+    </div>
+
+    <div id="links-box" class="hide" style="margin-top:14px;border-top:1px solid var(--line);padding-top:10px">
+      <h2>Wird automatisch mitgebucht</h2>
+      <table><tbody id="links-tb"></tbody></table>
+      <div class="row" style="margin-top:8px">
+        <label style="flex:3 1 200px">Zubehör<input id="lk-art" list="art-dl" placeholder="Suchen…"></label>
+        <label style="flex:0 1 90px">Menge je<input type="number" id="lk-qty" value="1" step="1" inputmode="decimal"></label>
+        <label style="flex:0 1 auto;flex-direction:row;align-items:center;gap:6px;color:var(--fg)"><input type="checkbox" id="lk-inc"> inklusive (0 €)</label>
+        <button class="b" onclick="addLink()">Verknüpfen</button>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <input id="a-filter" placeholder="Filtern…" style="width:100%;margin-bottom:8px" oninput="renderArticles()">
+    <div class="tw"><table>
+      <thead><tr><th>Kategorie</th><th>Artikel</th><th class="n">Bestand</th><th class="n">Preis/Tag</th><th></th></tr></thead>
+      <tbody id="art-tb"></tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- LAGER -->
+<section id="v-stock" class="hide">
+  <div class="card">
+    <div class="row">
+      <label>Von<input type="date" id="s-start"></label>
+      <label>Bis<input type="date" id="s-end"></label>
+      <button class="b p" onclick="loadStock()">Prüfen</button>
+      <button class="b" onclick="exportStock()">Excel (Verfügbarkeit)</button>
+      <button class="b p" onclick="exportInventory()">Inventarliste Excel</button>
+    </div>
+  </div>
+  <div class="card"><div class="tw"><table>
+    <thead><tr><th>Kategorie</th><th>Artikel</th><th class="n">Bestand</th><th class="n">Gebucht</th><th class="n">Frei</th></tr></thead>
+    <tbody id="stock-tb"></tbody>
+  </table></div></div>
+</section>
+
+<!-- DATEN -->
+<section id="v-data" class="hide">
+  <div class="card">
+    <h2>Backup</h2>
+    <p class="mut">Alle Lagerdaten liegen nur auf diesem iPad. Sichere sie regelmäßig, z. B. nach jedem Job, und lege die Datei auf einen Stick oder Rechner.</p>
+    <div class="row"><button class="b p" onclick="backup()">Backup erstellen</button>
+      <label class="b">Backup laden<input type="file" accept=".json,application/json" class="hide" onchange="restore(this)"></label>
+      <span class="mut" id="last-backup"></span></div>
+  </div>
+  <div class="card">
+    <h2>Kabelplan</h2>
+    <p class="mut">Lager und Kabelplan teilen sich die Daten auf diesem iPad: Jobs erscheinen im Kabelplan unter Pläne → „Aus Lager übernehmen“, Packlisten hier im Job unter „Packliste aus Kabelplan“. Die Geräteliste kommt automatisch aus dem Kabelplan.</p>
+    <div class="row"><span class="mut" id="kp-status"></span><span style="flex:1"></span>
+      <label class="b">Geräteliste aus Datei laden<input type="file" accept=".csv,.json,.txt" class="hide" onchange="kpUpload(this)"></label>
+      <button class="b" onclick="exportKpInventory()">Lagerstand für Kabelplan (Datei)</button></div>
+  </div>
+  <div class="card">
+    <h2>Speicher</h2>
+    <p class="mut" id="storage-info"></p>
+  </div>
+</section>
+</main>
+<div id="toast"></div>
+<div id="modal" class="hide"></div>
+
+<script src="exceljs.min.js"></script>
+<script>
+'use strict';
+/* =========================================================================
+   Datenhaltung: ein Zustand, gespeichert in IndexedDB (Fallback localStorage)
+   ========================================================================= */
+const KP_SEED=[{"id":"lib-kairos-core-200-at-kc200","mfr":"Panasonic","name":"Kairos Core 200 (AT-KC200)","grp":"Bildmischer","aliases":["Kairos AT-KC200"]},{"id":"lib-videohub-40x40-12g","mfr":"Blackmagic Design","name":"Videohub 40x40 12G","grp":"Kreuzschiene","aliases":[]},{"id":"lib-videohub-20x20-12g","mfr":"Blackmagic Design","name":"Videohub 20x20 12G","grp":"Kreuzschiene","aliases":[]},{"id":"lib-atem-1-m-e-constellation-hd","mfr":"Blackmagic Design","name":"ATEM 1 M/E Constellation HD","grp":"Bildmischer","aliases":[]},{"id":"lib-atem-2-m-e-constellation-hd","mfr":"Blackmagic Design","name":"ATEM 2 M/E Constellation HD","grp":"Bildmischer","aliases":[]},{"id":"lib-atem-4-m-e-constellation-hd","mfr":"Blackmagic Design","name":"ATEM 4 M/E Constellation HD","grp":"Bildmischer","aliases":[]},{"id":"lib-atem-1-m-e-constellation-4k","mfr":"Blackmagic Design","name":"ATEM 1 M/E Constellation 4K","grp":"Bildmischer","aliases":[]},{"id":"lib-atem-2-m-e-constellation-4k","mfr":"Blackmagic Design","name":"ATEM 2 M/E Constellation 4K","grp":"Bildmischer","aliases":[]},{"id":"lib-atem-4-m-e-constellation-4k","mfr":"Blackmagic Design","name":"ATEM 4 M/E Constellation 4K","grp":"Bildmischer","aliases":[]},{"id":"lib-atem-4-m-e-constellation-4k-plus","mfr":"Blackmagic Design","name":"ATEM 4 M/E Constellation 4K Plus","grp":"Bildmischer","aliases":[]},{"id":"lib-atem-television-studio-hd8","mfr":"Blackmagic Design","name":"ATEM Television Studio HD8","grp":"Bildmischer","aliases":[]},{"id":"lib-atem-television-studio-hd8-iso","mfr":"Blackmagic Design","name":"ATEM Television Studio HD8 ISO","grp":"Bildmischer","aliases":[]},{"id":"lib-atem-television-studio-4k8","mfr":"Blackmagic Design","name":"ATEM Television Studio 4K8","grp":"Bildmischer","aliases":[]},{"id":"lib-atem-mini-pro","mfr":"Blackmagic Design","name":"ATEM Mini Pro","grp":"Bildmischer","aliases":[]},{"id":"lib-atem-mini-pro-iso","mfr":"Blackmagic Design","name":"ATEM Mini Pro ISO","grp":"Bildmischer","aliases":[]},{"id":"lib-atem-mini-extreme","mfr":"Blackmagic Design","name":"ATEM Mini Extreme","grp":"Bildmischer","aliases":["ATEM Mini Extreme ISO"]},{"id":"lib-atem-mini-extreme-iso-g2","mfr":"Blackmagic Design","name":"ATEM Mini Extreme ISO G2","grp":"Bildmischer","aliases":[]},{"id":"lib-atem-sdi","mfr":"Blackmagic Design","name":"ATEM SDI","grp":"Bildmischer","aliases":[]},{"id":"lib-atem-sdi-pro-iso","mfr":"Blackmagic Design","name":"ATEM SDI Pro ISO","grp":"Bildmischer","aliases":[]},{"id":"lib-atem-sdi-extreme-iso","mfr":"Blackmagic Design","name":"ATEM SDI Extreme ISO","grp":"Bildmischer","aliases":[]},{"id":"lib-atem-streaming-bridge","mfr":"Blackmagic Design","name":"ATEM Streaming Bridge","grp":"Interface","aliases":[]},{"id":"lib-atem-microphone-converter","mfr":"Blackmagic Design","name":"ATEM Microphone Converter","grp":"Interface","aliases":[]},{"id":"lib-pds-4k-sdi-audio-dp-karte","mfr":"Barco","name":"PDS-4K SDI + Audio/DP-Karte","grp":"Bildmischer","aliases":[]},{"id":"lib-zenith-200","mfr":"Analog Way","name":"Zenith 200","grp":"Bildmischer","aliases":[]},{"id":"lib-pulse-4k","mfr":"Analog Way","name":"Pulse 4K","grp":"Bildmischer","aliases":[]},{"id":"lib-aquilon-c-beispielbest-ckung","mfr":"Analog Way","name":"Aquilon C (Beispielbestückung)","grp":"Bildmischer","aliases":[]},{"id":"lib-aw-ue160","mfr":"Panasonic","name":"AW-UE160","grp":"Kamera","aliases":[]},{"id":"lib-aw-ue150","mfr":"Panasonic","name":"AW-UE150","grp":"Kamera","aliases":[]},{"id":"lib-aw-he145","mfr":"Panasonic","name":"AW-HE145","grp":"Kamera","aliases":[]},{"id":"lib-aw-he130","mfr":"Panasonic","name":"AW-HE130","grp":"Kamera","aliases":[]},{"id":"lib-aw-ue100","mfr":"Panasonic","name":"AW-UE100","grp":"Kamera","aliases":[]},{"id":"lib-aw-ub10","mfr":"Panasonic","name":"AW-UB10","grp":"Kamera","aliases":[]},{"id":"lib-blackmagic-media-player-10g","mfr":"Blackmagic Design","name":"Blackmagic Media Player 10G","grp":"Zuspieler","aliases":["Blackmagic Media Player 10G"]},{"id":"lib-hyperdeck-studio-4k-pro","mfr":"Blackmagic Design","name":"HyperDeck Studio 4K Pro","grp":"Zuspieler","aliases":[]},{"id":"lib-pixera-two-gen-2","mfr":"AV Stumpfl","name":"PIXERA two Gen.2","grp":"Medienserver","aliases":[]},{"id":"lib-pixera-four","mfr":"AV Stumpfl","name":"PIXERA four","grp":"Medienserver","aliases":[]},{"id":"lib-disguise-vx-4","mfr":"disguise","name":"disguise VX 4+","grp":"Medienserver","aliases":[]},{"id":"lib-disguise-gx-3","mfr":"disguise","name":"disguise GX 3","grp":"Medienserver","aliases":[]},{"id":"lib-disguise-ex-3","mfr":"disguise","name":"disguise EX 3","grp":"Medienserver","aliases":[]},{"id":"lib-picturall-quad-mark-ii","mfr":"Analog Way","name":"Picturall Quad Mark II","grp":"Medienserver","aliases":[]},{"id":"lib-teranex-mini-sdi-to-hdmi-12g","mfr":"Blackmagic Design","name":"Teranex Mini SDI to HDMI 12G","grp":"Interface","aliases":[]},{"id":"lib-teranex-mini-hdmi-to-sdi-12g","mfr":"Blackmagic Design","name":"Teranex Mini HDMI to SDI 12G","grp":"Interface","aliases":[]},{"id":"lib-micro-converter-bidirectional-sdi-hdmi-12g","mfr":"Blackmagic Design","name":"Micro Converter BiDirectional SDI/HDMI 12G","grp":"Interface","aliases":[]},{"id":"lib-micro-converter-sdi-to-hdmi-12g","mfr":"Blackmagic Design","name":"Micro Converter SDI to HDMI 12G","grp":"Interface","aliases":[]},{"id":"lib-micro-converter-hdmi-to-sdi-12g","mfr":"Blackmagic Design","name":"Micro Converter HDMI to SDI 12G","grp":"Interface","aliases":[]},{"id":"lib-mini-converter-sdi-distribution-4k","mfr":"Blackmagic Design","name":"Mini Converter SDI Distribution 4K","grp":"Interface","aliases":[]},{"id":"lib-2110-ip-mini-bidirect-12g","mfr":"Blackmagic Design","name":"2110 IP Mini BiDirect 12G","grp":"Interface","aliases":[]},{"id":"lib-md-hx","mfr":"Decimator","name":"MD-HX","grp":"Interface","aliases":[]},{"id":"lib-md-lx","mfr":"Decimator","name":"MD-LX","grp":"Interface","aliases":[]},{"id":"lib-12g-cross","mfr":"Decimator","name":"12G-CROSS","grp":"Interface","aliases":[]},{"id":"lib-riedel-mediornet-fusion-6b","mfr":"Riedel","name":"Riedel MediorNet FusioN 6B","grp":"Interface","aliases":["Fusion 6B 2xHDMI In"]},{"id":"lib-mini-converter-sync-generator","mfr":"Blackmagic Design","name":"Mini Converter Sync Generator","grp":"Takt","aliases":[]},{"id":"lib-lilliput-bm280-4ks","mfr":"Lilliput","name":"Lilliput BM280-4KS","grp":"Monitor","aliases":[]},{"id":"lib-lilliput-bm280-12g-28","mfr":"Lilliput","name":"Lilliput BM280-12G 28\"","grp":"Monitor","aliases":[]},{"id":"lib-prolite-x4373uhsu-b1-42-5","mfr":"iiyama","name":"ProLite X4373UHSU-B1 42.5\"","grp":"Monitor","aliases":[]},{"id":"lib-dmon-quad","mfr":"Decimator","name":"DMON-QUAD","grp":"Monitor","aliases":[]},{"id":"lib-pt-rq50k","mfr":"Panasonic","name":"PT-RQ50K","grp":"Projektor","aliases":[]},{"id":"lib-pt-rq35k2","mfr":"Panasonic","name":"PT-RQ35K2","grp":"Projektor","aliases":[]},{"id":"lib-pt-req15","mfr":"Panasonic","name":"PT-REQ15","grp":"Projektor","aliases":[]},{"id":"lib-tessera-sx40","mfr":"Brompton","name":"Tessera SX40","grp":"LED-Prozessor","aliases":[]},{"id":"lib-tessera-s8","mfr":"Brompton","name":"Tessera S8","grp":"LED-Prozessor","aliases":[]},{"id":"lib-tessera-sq200","mfr":"Brompton","name":"Tessera SQ200","grp":"LED-Prozessor","aliases":[]},{"id":"lib-tessera-xd","mfr":"Brompton","name":"Tessera XD","grp":"LED-Prozessor","aliases":[]},{"id":"lib-novastar-mx40-pro","mfr":"NovaStar","name":"NovaStar MX40 Pro","grp":"LED-Prozessor","aliases":[]},{"id":"lib-novastar-vx1000","mfr":"NovaStar","name":"NovaStar VX1000","grp":"LED-Prozessor","aliases":[]},{"id":"lib-novastar-vx600-pro","mfr":"NovaStar","name":"NovaStar VX600 Pro","grp":"LED-Prozessor","aliases":[]},{"id":"lib-novastar-cvt10-pro-s","mfr":"NovaStar","name":"NovaStar CVT10 Pro-S","grp":"LED-Prozessor","aliases":[]},{"id":"lib-sonicview-16-if-st2110","mfr":"TASCAM","name":"Sonicview 16 + IF-ST2110","grp":"Audio","aliases":[]},{"id":"lib-m4350-16v4c","mfr":"NETGEAR","name":"M4350-16V4C","grp":"Netzwerk","aliases":["M4350-16V4C"]},{"id":"lib-m4350-24x4v","mfr":"NETGEAR","name":"M4350-24X4V","grp":"Netzwerk","aliases":["M4350-24X4V"]},{"id":"lib-roland-v-160hd","mfr":"Roland","name":"Roland V-160HD","grp":"Bildmischer","aliases":[]},{"id":"lib-roland-v-80hd","mfr":"Roland","name":"Roland V-80HD","grp":"Bildmischer","aliases":[]},{"id":"lib-stream-deck-studio","mfr":"Elgato","name":"Stream Deck Studio","grp":"Steuerung","aliases":[]},{"id":"lib-stream-deck-xl","mfr":"Elgato","name":"Stream Deck XL","grp":"Steuerung","aliases":[]},{"id":"lib-macbook-pro-16-vorlage","mfr":"Apple","name":"MacBook Pro 16\" (Vorlage)","grp":"Computer","aliases":[]},{"id":"lib-windows-laptop-vorlage","mfr":"","name":"Windows-Laptop (Vorlage)","grp":"Computer","aliases":[]},{"id":"lib-qsc-k8-2","mfr":"QSC","name":"QSC K8.2","grp":"Lautsprecher","aliases":[]},{"id":"lib-qsc-k10-2","mfr":"QSC","name":"QSC K10.2","grp":"Lautsprecher","aliases":[]},{"id":"lib-qsc-k12-2","mfr":"QSC","name":"QSC K12.2","grp":"Lautsprecher","aliases":[]},{"id":"lib-qsc-ks118","mfr":"QSC","name":"QSC KS118","grp":"Lautsprecher","aliases":[]},{"id":"lib-dm3","mfr":"Yamaha","name":"DM3","grp":"Audio","aliases":["DM3"]},{"id":"lib-tio1608-d2","mfr":"Yamaha","name":"Tio1608-D2","grp":"Stagebox","aliases":["Tio1608-D2"]},{"id":"lib-laptop-timer-ppt-companion","mfr":"","name":"Laptop Timer/PPT/Companion","grp":"Computer","aliases":["Laptop Timer/PPT/Companion"]},{"id":"lib-usb-3-2-matrix-4x4-ip","mfr":"","name":"USB 3.2 Matrix 4x4 (IP)","grp":"Kreuzschiene","aliases":["USB 3.2 Matrix 4x4 (IP)"]},{"id":"lib-perfectcue-mini","mfr":"DSAN","name":"PerfectCue Mini","grp":"Steuerung","aliases":["PerfectCue Mini"]},{"id":"lib-usb-c-auf-stereo-xlr","mfr":"","name":"USB-C auf Stereo XLR","grp":"Interface","aliases":["USB-C auf Stereo XLR"]},{"id":"lib-aw-rp150","mfr":"Panasonic","name":"AW-RP150","grp":"Steuerung","aliases":["AW-RP150"]},{"id":"lib-generisches-sdi-ger-t","mfr":"","name":"Generisches SDI-Gerät","grp":"Sonstiges","aliases":["Generisches SDI-Gerät"]}];
+const DBNAME='kleem-lager', LSKEY='kleem-lager-state-v1';
+const K_LAGER_BRIDGE='kleem.lager.export.v1', K_KP_LIB='kleem.kabelplan.library.v1', K_KP_PACK='kleem.kabelplan.packlisten.v1';
+const MAX_LINK_DEPTH=5;
+let S=null;
+function blank(){return{v:1,seq:{a:0,u:0,l:0,j:0,p:0},articles:[],units:[],links:[],jobs:[],positions:[],kp_map:{},kp_devices:[],lastBackup:null};}
+function idb(){return new Promise((res,rej)=>{if(!('indexedDB' in window))return rej('no idb');const r=indexedDB.open(DBNAME,1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
+async function loadState(){
+  try{const db=await idb();S=await new Promise((res,rej)=>{const t=db.transaction('kv').objectStore('kv').get('state');t.onsuccess=()=>res(t.result||null);t.onerror=()=>rej(t.error);});}catch(e){}
+  if(!S){try{const r=localStorage.getItem(LSKEY);if(r)S=JSON.parse(r);}catch(e){}}
+  S=Object.assign(blank(),S||{});
+  try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist();}catch(e){}
+}
+let saveT;
+function persist(){clearTimeout(saveT);saveT=setTimeout(async()=>{
+  const data=JSON.parse(JSON.stringify(S));
+  try{const db=await idb();await new Promise((res,rej)=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').put(data,'state');t.oncomplete=res;t.onerror=()=>rej(t.error);});}
+  catch(e){try{localStorage.setItem(LSKEY,JSON.stringify(data));}catch(e2){toast('Speichern fehlgeschlagen – bitte Backup erstellen');}}
+  try{localStorage.setItem(K_LAGER_BRIDGE,JSON.stringify(lagerBridge()));}catch(e){}
+},200);}
+const nid=k=>++S.seq[k];
+class ApiError extends Error{constructor(status,detail){super(detail);this.status=status;this.detail=detail;}}
+const err=(s,d)=>{throw new ApiError(s,d);};
+const art=id=>S.articles.find(a=>a.id===id);
+const jobBy=id=>S.jobs.find(j=>j.id===id);
+const r2=v=>Math.round((v+Number.EPSILON)*100)/100;
+
+/* ---------- Artikel ---------- */
+function listArticles(){
+  const cnt={},ucnt={};S.links.forEach(l=>cnt[l.parent_id]=(cnt[l.parent_id]||0)+1);S.units.forEach(u=>ucnt[u.article_id]=(ucnt[u.article_id]||0)+1);
+  return S.articles.slice().sort((a,b)=>(a.category||'').localeCompare(b.category||'','de')||a.name.localeCompare(b.name,'de',{numeric:true}))
+    .map(a=>({...a,link_count:cnt[a.id]||0,unit_count:ucnt[a.id]||0}));
+}
+function articleFields(b){return{name:String(b.name||'').trim(),category:b.category||'',stock:parseInt(b.stock)||0,price:+b.price||0,notes:b.notes||'',
+  manufacturer:b.manufacturer||'',inv_no:b.inv_no||'',purchase_date:b.purchase_date||null,value:+b.value||0,kabelplan_id:String(b.kabelplan_id||'').trim()};}
+function syncStock(aid){const n=S.units.filter(u=>u.article_id===aid).length;if(n)art(aid).stock=n;}
+function cycle(parent,child){const stack=[child],seen=new Set();while(stack.length){const c=stack.pop();if(c===parent)return true;if(seen.has(c))continue;seen.add(c);S.links.filter(l=>l.parent_id===c).forEach(l=>stack.push(l.child_id));}return false;}
+
+/* ---------- Jobs / Positionen ---------- */
+function lineTotal(p,jf){if(p.included)return 0;const f=p.factor!=null?p.factor:jf;return r2((p.qty||0)*(p.price||0)*(f||0)*(1-(p.discount||0)/100));}
+function positionsOf(job){
+  const ps=S.positions.filter(p=>p.job_id===job.id).sort((a,b)=>a.id-b.id).map(p=>({...p,category:(art(p.article_id)||{}).category||null}));
+  const kids={};ps.forEach(p=>(kids[p.parent_pos_id??'root']??=[]).push(p));const out=[];
+  const walk=(par,d)=>(kids[par??'root']||[]).forEach(p=>{p.depth=d;p.eff_factor=p.factor!=null?p.factor:job.factor;p.total=lineTotal(p,job.factor);out.push(p);walk(p.id,d+1);});
+  walk(null,0);return out;
+}
+function overlaps(j,start,end){if(!j.start_date)return false;return j.start_date<=end&&(j.end_date||j.start_date)>=start;}
+function bookedElsewhere(start,end,exclude){
+  if(!start)return{};end=end||start;const ids=new Set(S.jobs.filter(j=>j.id!==exclude&&overlaps(j,start,end)).map(j=>j.id));const o={};
+  S.positions.forEach(p=>{if(p.article_id!=null&&ids.has(p.job_id))o[p.article_id]=(o[p.article_id]||0)+(p.qty||0);});return o;
+}
+function getJob(jid){
+  const job={...(jobBy(jid)||err(404,'Job nicht gefunden'))};const ps=positionsOf(job);
+  const other=bookedElsewhere(job.start_date,job.end_date,jid);const need={};
+  ps.forEach(p=>{if(p.article_id!=null)need[p.article_id]=(need[p.article_id]||0)+p.qty;});
+  const warnings={};Object.entries(need).forEach(([aid,q])=>{const a=art(+aid);const st=a?a.stock:0;const free=st-(other[aid]||0);if(q>free)warnings[aid]={need:q,free,stock:st};});
+  ps.forEach(p=>p.warning=warnings[p.article_id]||null);
+  job.positions=ps;job.total=r2(ps.reduce((s,p)=>s+p.total,0));job.warning_count=Object.keys(warnings).length;return job;
+}
+function addArticlePos(job_id,article_id,qty,parent=null,link_qty=null,included=false,depth=0,path=[],source=''){
+  const a=art(article_id)||err(404,'Artikel nicht gefunden');
+  const p={id:nid('p'),job_id,article_id,parent_pos_id:parent,link_qty,name:a.name,qty,price:a.price,factor:null,discount:0,included:included?1:0,source};
+  S.positions.push(p);
+  if(depth<MAX_LINK_DEPTH)S.links.filter(l=>l.parent_id===article_id).forEach(l=>{if(path.includes(l.child_id)||l.child_id===article_id)return;
+    addArticlePos(job_id,l.child_id,qty*l.qty,p.id,l.qty,!!l.included,depth+1,[...path,article_id],source);});
+  return p.id;
+}
+function rescale(pid,qty){S.positions.filter(c=>c.parent_pos_id===pid).forEach(c=>{if(c.link_qty!=null){c.qty=qty*c.link_qty;rescale(c.id,c.qty);}});}
+function deletePos(pid){const kids=S.positions.filter(p=>p.parent_pos_id===pid).map(p=>p.id);S.positions=S.positions.filter(p=>p.id!==pid);kids.forEach(deletePos);}
+
+/* ---------- Kabelplan ---------- */
+const norm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+function kpDevices(){
+  let l=null;try{const r=localStorage.getItem(K_KP_LIB);if(r){const d=JSON.parse(r);l=d.devices||null;}}catch(e){}
+  const src=l?'kabelplan':(S.kp_devices.length?'datei':'mitgeliefert');
+  l=l||(S.kp_devices.length?S.kp_devices:KP_SEED);
+  return{src,list:l.map(d=>{const m=(d.mfr||'').replace(/^Blackmagic Design$/,'Blackmagic');return{...d,aliases:d.aliases||[],label:(!m||norm(d.name).startsWith(norm(m)))?d.name:m+' '+d.name};})};
+}
+function matchKp(devs,mfr,name){
+  const cands=[name,(mfr+' '+name).trim()].filter(Boolean);
+  for(const c of cands){const q=norm(c);for(const d of devs){if([d.name,d.label,d.mfr+' '+d.name,...d.aliases].some(n=>norm(n)===q))return d;}}
+  for(const c of cands){const q=norm(c);if(q.length<5)continue;const hits=devs.filter(d=>[d.name,d.label,...d.aliases].some(n=>{const m=norm(n);return m.length>=5&&(m.includes(q)||q.includes(m));}));if(hits.length===1)return hits[0];}
+  return tokMatch(devs.map(d=>[d,[d.name,...d.aliases]]),name);
+}
+const toks=s=>new Set(String(s||'').toLowerCase().split(/[^a-z0-9äöüß]+/).filter(Boolean));
+function tokMatch(pairs,name){const q=toks(name);if(q.size<2)return null;
+  const eq=[],sup=[];pairs.forEach(([o,ns])=>ns.forEach(n=>{const t=toks(n);if([...q].every(x=>t.has(x))){(t.size===q.size?eq:sup).push(o);}}));
+  const u=a=>[...new Set(a)];return u(eq).length===1?u(eq)[0]:(!eq.length&&u(sup).length===1?u(sup)[0]:null);}
+function availForJob(job){const other=bookedElsewhere(job.start_date,job.end_date,job.id);const out={};
+  S.articles.filter(a=>a.kabelplan_id).forEach(a=>out[a.kabelplan_id]=(out[a.kabelplan_id]||0)+Math.max(0,a.stock-Math.round(other[a.id]||0)));return out;}
+function lagerJobExport(jid){
+  const job=jobBy(jid)||err(404,'Job nicht gefunden');const ps=positionsOf(job);const pos=[];
+  ps.forEach(p=>{const a=art(p.article_id);const typ=!a?'frei':(p.depth===0?'artikel':'zubehoer');if(p.source==='kabelplan'&&typ!=='artikel')return;
+    pos.push({typ,kabelplan_id:(a&&a.kabelplan_id)||'',hersteller:(a&&a.manufacturer)||'',bezeichnung:p.name,kategorie:(a&&a.category)||'',menge:p.qty});});
+  return{kind:'kleem-lager-job',v:1,job:{id:job.id,name:job.name,kunde:job.customer,von:job.start_date,bis:job.end_date,ort:job.location},
+    positionen:pos,inventar:Object.entries(availForJob(job)).map(([k,v])=>({kabelplan_id:k,bestand:v}))};
+}
+function lagerBridge(){
+  const today=new Date().toISOString().slice(0,10);const cut=new Date(Date.now()-90*864e5).toISOString().slice(0,10);
+  const jobs=S.jobs.filter(j=>!j.end_date&&!j.start_date||(j.end_date||j.start_date||today)>=cut).sort((a,b)=>(b.start_date||'').localeCompare(a.start_date||'')).slice(0,60);
+  const inv={};S.articles.filter(a=>a.kabelplan_id).forEach(a=>inv[a.kabelplan_id]=(inv[a.kabelplan_id]||0)+a.stock);
+  return{kind:'kleem.lager.export',v:1,updated:new Date().toISOString(),inventar:Object.entries(inv).map(([k,v])=>({kabelplan_id:k,bestand:v})),
+    jobs:jobs.map(j=>lagerJobExport(j.id))};
+}
+function matchArticle(label){const m=S.kp_map[label];if(m&&art(m))return art(m);const q=norm(label);const ex=S.articles.filter(a=>norm(a.name)===q);return ex.length===1?ex[0]:null;}
+function packPreview(jid,d){
+  if(!d||d.kind!=='kleem-kabelplan-packliste')err(400,'Das ist keine Packliste aus dem Kabelplan');
+  jobBy(jid)||err(404,'Job nicht gefunden');
+  const byKp={};S.articles.forEach(a=>{if(a.kabelplan_id&&!byKp[a.kabelplan_id])byKp[a.kabelplan_id]=a;});
+  const booked={};S.positions.filter(p=>p.job_id===jid&&p.parent_pos_id==null&&p.article_id!=null&&p.source!=='kabelplan').forEach(p=>booked[p.article_id]=(booked[p.article_id]||0)+p.qty);
+  const need={};(d.geraete||[]).forEach(g=>need[g.kabelplan_id]=(need[g.kabelplan_id]||0)+g.menge);
+  const lines=[];
+  (d.geraete||[]).forEach(g=>{const h=g.hersteller||'',n=g.bezeichnung||'';const label=!h||norm(n).startsWith(norm(h))?n:h+' '+n;
+    const a=byKp[g.kabelplan_id]||matchArticle(label);const b=a?(booked[a.id]||0):0;
+    if(g.zumiete){const total=need[g.kabelplan_id]||0;const dup=!!a&&b>=total;
+      lines.push({kind:'zumiete',label:'Zumiete: '+label,qty:g.menge,booked:0,mode:dup?'skip':'free',article_id:null,article_name:'',
+        info:dup?`Im Job sind schon ${b} Stk. aus dem Lager gebucht (überbucht). Lagermenge auf ${total-g.menge} senken und Zumiete übernehmen.`:''});return;}
+    lines.push({kind:'geraet',label,qty:g.menge,booked:b,mode:a?(g.menge>b?'article':'skip'):'free',article_id:a?a.id:null,article_name:a?a.name:''});});
+  [['kabel','kabel'],['zubehoer','zubehoer']].forEach(([kind,key])=>(d[key]||[]).forEach(x=>{const a=matchArticle(x.bezeichnung);
+    lines.push({kind,label:x.bezeichnung,qty:x.menge,booked:0,mode:a?'article':'free',article_id:a?a.id:null,article_name:a?a.name:''});}));
+  (d.software||[]).forEach(x=>{const label='Software: '+x.name;const a=matchArticle(label)||matchArticle(x.name);
+    lines.push({kind:'software',label,qty:x.menge,booked:0,mode:a?'article':'free',article_id:a?a.id:null,article_name:a?a.name:'',info:(x.rechner||[]).join(', ')});});
+  (d.cases||[]).forEach(x=>{const label='Case: '+x.bezeichnung+(x.typ?` (${x.typ})`:'');const a=matchArticle(x.typ||'');
+    lines.push({kind:'case',label,qty:1,booked:0,mode:a?'article':'skip',article_id:a?a.id:null,article_name:a?a.name:''});});
+  return{plan:d.plan||{},lines};
+}
+function packApply(jid,lines){
+  jobBy(jid)||err(404,'Job nicht gefunden');
+  const old=S.positions.filter(p=>p.job_id===jid&&p.source==='kabelplan'&&p.parent_pos_id==null).map(p=>p.id);old.forEach(deletePos);
+  let added=0;
+  lines.forEach(l=>{if(l.mode==='skip')return;const qty=l.qty-(l.kind==='geraet'?(l.booked||0):0);if(qty<=0)return;
+    if(l.mode==='article'&&l.article_id){addArticlePos(jid,l.article_id,qty,null,null,false,0,[],'kabelplan');if(l.remember!==false&&!['geraet','zumiete'].includes(l.kind))S.kp_map[l.label]=l.article_id;}
+    else S.positions.push({id:nid('p'),job_id:jid,article_id:null,parent_pos_id:null,link_qty:null,name:l.label,qty,price:0,factor:1,discount:0,included:0,source:'kabelplan'});
+    added++;});
+  return{added,replaced:old.length};
+}
+
+/* ---------- CSV ---------- */
+function parseCsv(text){
+  const first=text.split(/\r?\n/)[0]||'';const cnt=c=>first.split(c).length;const d=[';',',','\t'].sort((a,b)=>cnt(b)-cnt(a))[0];
+  const rows=[];let row=[],f='',q=false;
+  for(let i=0;i<text.length;i++){const c=text[i];
+    if(q){if(c==='"'){if(text[i+1]==='"'){f+='"';i++;}else q=false;}else f+=c;}
+    else if(c==='"')q=true;else if(c===d){row.push(f);f='';}else if(c==='\n'||c==='\r'){if(c==='\r'&&text[i+1]==='\n')i++;row.push(f);rows.push(row);row=[];f='';}else f+=c;}
+  if(f||row.length){row.push(f);rows.push(row);}return rows;
+}
+function num(v,def=0){v=String(v||'').trim().replace(/€/g,'').replace(/\s/g,'');if(!v)return def;if(v.includes(','))v=v.replace(/\./g,'').replace(',','.');const n=parseFloat(v);return isNaN(n)?def:n;}
+
+/* =========================================================================
+   API-Schicht: gleiche Pfade wie die Server-Version, damit die Oberfläche gleich bleibt
+   ========================================================================= */
+const routes=[
+ ['GET',/^\/articles$/,()=>listArticles()],
+ ['POST',/^\/articles$/,(m,b)=>{const a={id:nid('a'),...articleFields(b)};S.articles.push(a);return{id:a.id};}],
+ ['PUT',/^\/articles\/(\d+)$/,(m,b)=>{const a=art(+m[1])||err(404,'Artikel nicht gefunden');Object.assign(a,articleFields(b));syncStock(a.id);return{ok:true};}],
+ ['DELETE',/^\/articles\/(\d+)$/,m=>{const id=+m[1];S.articles=S.articles.filter(a=>a.id!==id);S.units=S.units.filter(u=>u.article_id!==id);S.links=S.links.filter(l=>l.parent_id!==id&&l.child_id!==id);
+   S.positions.forEach(p=>{if(p.article_id===id)p.article_id=null;});Object.keys(S.kp_map).forEach(k=>{if(S.kp_map[k]===id)delete S.kp_map[k];});return{ok:true};}],
+ ['GET',/^\/articles\/(\d+)\/units$/,m=>S.units.filter(u=>u.article_id===+m[1]).sort((a,b)=>(a.inv_no||'').localeCompare(b.inv_no||'')||(a.serial||'').localeCompare(b.serial||'')||a.id-b.id)],
+ ['POST',/^\/articles\/(\d+)\/units$/,(m,b)=>{const aid=+m[1];art(aid)||err(404,'Artikel nicht gefunden');const u={id:nid('u'),article_id:aid,serial:b.serial||'',inv_no:b.inv_no||'',purchase_date:b.purchase_date||null,value:b.value==null?null:+b.value,notes:b.notes||''};S.units.push(u);syncStock(aid);return{id:u.id};}],
+ ['DELETE',/^\/units\/(\d+)$/,m=>{const u=S.units.find(x=>x.id===+m[1])||err(404,'Gerät nicht gefunden');S.units=S.units.filter(x=>x!==u);syncStock(u.article_id);return{ok:true};}],
+ ['GET',/^\/articles\/(\d+)\/links$/,m=>S.links.filter(l=>l.parent_id===+m[1]).map(l=>({...l,child_name:(art(l.child_id)||{}).name,child_price:(art(l.child_id)||{}).price})).sort((a,b)=>(a.child_name||'').localeCompare(b.child_name||'','de'))],
+ ['POST',/^\/articles\/(\d+)\/links$/,(m,b)=>{const p=+m[1],c=+b.child_id;if(p===c||cycle(p,c))err(400,'Verknüpfung würde eine Schleife erzeugen');
+   const ex=S.links.find(l=>l.parent_id===p&&l.child_id===c);if(ex){ex.qty=+b.qty||1;ex.included=b.included?1:0;}else S.links.push({id:nid('l'),parent_id:p,child_id:c,qty:+b.qty||1,included:b.included?1:0});return{ok:true};}],
+ ['DELETE',/^\/links\/(\d+)$/,m=>{S.links=S.links.filter(l=>l.id!==+m[1]);return{ok:true};}],
+ ['POST',/^\/articles\/import$/,(m,b)=>{let rows=parseCsv(b.text);if(rows.length&&!/\d/.test((rows[0].slice(2,4)).join('')))rows=rows.slice(1);let n=0;
+   rows.forEach(r=>{if(!r.length||!String(r[0]).trim())return;while(r.length<9)r.push('');
+     S.articles.push({id:nid('a'),name:r[0].trim(),category:r[1].trim(),stock:Math.trunc(num(r[2])),price:num(r[3]),notes:r[4].trim(),manufacturer:r[5].trim(),inv_no:r[6].trim(),purchase_date:null,value:num(r[7]),kabelplan_id:r[8].trim()});n++;});return{imported:n};}],
+ ['GET',/^\/jobs$/,()=>S.jobs.slice().sort((a,b)=>(b.start_date||'').localeCompare(a.start_date||'')||b.id-a.id).map(j=>({...j,total:r2(positionsOf(j).reduce((s,p)=>s+p.total,0))}))],
+ ['POST',/^\/jobs$/,(m,b)=>{const j={id:nid('j'),name:String(b.name||'').trim(),customer:b.customer||'',start_date:b.start_date||null,end_date:b.end_date||b.start_date||null,location:b.location||'',notes:b.notes||'',factor:b.factor==null?1:+b.factor};S.jobs.push(j);return{id:j.id};}],
+ ['PUT',/^\/jobs\/(\d+)$/,(m,b)=>{const j=jobBy(+m[1])||err(404,'Job nicht gefunden');Object.assign(j,{name:b.name,customer:b.customer||'',start_date:b.start_date||null,end_date:b.end_date||b.start_date||null,location:b.location||'',notes:b.notes||'',factor:+b.factor||1});return{ok:true};}],
+ ['DELETE',/^\/jobs\/(\d+)$/,m=>{const id=+m[1];S.jobs=S.jobs.filter(j=>j.id!==id);S.positions=S.positions.filter(p=>p.job_id!==id);return{ok:true};}],
+ ['POST',/^\/jobs\/(\d+)\/copy$/,m=>{const j=jobBy(+m[1])||err(404,'Job nicht gefunden');const n={...j,id:nid('j'),name:j.name+' (Kopie)'};S.jobs.push(n);const map={};
+   S.positions.filter(p=>p.job_id===j.id).sort((a,b)=>a.id-b.id).forEach(p=>{const q={...p,id:nid('p'),job_id:n.id,parent_pos_id:p.parent_pos_id!=null?map[p.parent_pos_id]??null:null};map[p.id]=q.id;S.positions.push(q);});return{id:n.id};}],
+ ['GET',/^\/jobs\/(\d+)$/,m=>getJob(+m[1])],
+ ['POST',/^\/jobs\/(\d+)\/positions$/,(m,b)=>{const jid=+m[1];jobBy(jid)||err(404,'Job nicht gefunden');
+   if(b.article_id){const pid=addArticlePos(jid,+b.article_id,+b.qty||1);if(b.price!=null)S.positions.find(p=>p.id===pid).price=+b.price;return{id:pid};}
+   if(!String(b.name||'').trim())err(400,'Bezeichnung fehlt');const p={id:nid('p'),job_id:jid,article_id:null,parent_pos_id:null,link_qty:null,name:b.name.trim(),qty:+b.qty||1,price:+b.price||0,factor:1,discount:0,included:0,source:''};S.positions.push(p);return{id:p.id};}],
+ ['PUT',/^\/positions\/(\d+)$/,(m,u)=>{const p=S.positions.find(x=>x.id===+m[1])||err(404,'Position nicht gefunden');
+   ['name','price','discount'].forEach(k=>{if(u[k]!=null)p[k]=u[k];});if(u.included!=null)p.included=u.included?1:0;
+   if(u.clear_factor)p.factor=null;else if(u.factor!=null)p.factor=u.factor;
+   if(u.qty!=null){p.qty=u.qty;p.link_qty=null;rescale(p.id,u.qty);}return{ok:true};}],
+ ['DELETE',/^\/positions\/(\d+)$/,m=>{deletePos(+m[1]);return{ok:true};}],
+ ['GET',/^\/availability$/,(m,b,q)=>{const booked=bookedElsewhere(q.get('start'),q.get('end'));return listArticles().map(a=>({id:a.id,name:a.name,category:a.category,stock:a.stock,price:a.price,booked:booked[a.id]||0,free:a.stock-(booked[a.id]||0)}));}],
+ ['GET',/^\/kabelplan\/devices$/,()=>kpDevices().list],
+ ['POST',/^\/kabelplan\/devices$/,(m,b)=>{const raw=b.text.replace(/^﻿/,'');const items=[];
+   if(/^\s*[\[{]/.test(raw)){const d=JSON.parse(raw);(Array.isArray(d)?d:(d.lib||d.devices||[])).forEach(g=>items.push({id:g.id,mfr:g.mfr||'',name:g.name,grp:g.group||g.grp||'',aliases:g.aliases||[]}));}
+   else parseCsv(raw).forEach(r=>{if(r.length<3||/^(kabelplan_id|id)$/i.test(r[0].trim()))return;items.push({id:r[0].trim(),mfr:r[1].trim(),name:r[2].trim(),grp:(r[3]||'').trim(),aliases:[]});});
+   if(!items.length)err(400,'Keine Geräte in der Datei gefunden');S.kp_devices=items;return{imported:items.length};}],
+ ['POST',/^\/kabelplan\/automap$/,()=>{const devs=kpDevices().list;const done=[],open=[];
+   S.articles.filter(a=>!a.kabelplan_id).forEach(a=>{const d=matchKp(devs,a.manufacturer||'',a.name);if(d){a.kabelplan_id=d.id;done.push({article:a.name,kabelplan:d.label});}else open.push(a.name);});return{mapped:done,unmapped:open};}],
+ ['GET',/^\/jobs\/(\d+)\/kabelplan\.json$/,m=>lagerJobExport(+m[1])],
+ ['POST',/^\/jobs\/(\d+)\/packliste\/preview$/,(m,b)=>packPreview(+m[1],b.packliste)],
+ ['POST',/^\/jobs\/(\d+)\/packliste\/apply$/,(m,b)=>packApply(+m[1],b.lines||[])],
+];
+async function api(path,method='GET',body){
+  const [p,qs]=path.split('?');const q=new URLSearchParams(qs||'');
+  for(const [mm,re,fn] of routes){if(mm!==method)continue;const m=p.match(re);if(!m)continue;
+    try{const r=fn(m,body===undefined?{}:JSON.parse(JSON.stringify(body)),q);if(method!=='GET')persist();return JSON.parse(JSON.stringify(r));}
+    catch(e){toast(e.detail||e.message||'Fehler');throw e;}}
+  toast('Unbekannte Aktion');throw new Error('route '+method+' '+path);
+}
+
+/* =========================================================================
+   Oberfläche (wie Server-Version)
+   ========================================================================= */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const eur = v => (v || 0).toLocaleString('de-AT', {style: 'currency', currency: 'EUR'});
+const fnum = v => (v ?? 0).toLocaleString('de-AT', {maximumFractionDigits: 2});
+const dat = d => d ? d.split('-').reverse().join('.') : '';
+let ARTS = [], JOB = null, EDIT_ART = null, KP = [];
+
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('on'),2200)}
+function readFile(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsText(f);});}
+async function readCsvFile(f){const buf=await f.arrayBuffer();try{return new TextDecoder('utf-8',{fatal:true}).decode(buf);}catch(e){return new TextDecoder('windows-1252').decode(buf);}}
+async function saveBlob(blob,name){
+  try{const file=new File([blob],name,{type:blob.type});if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});return;}}
+  catch(e){if(e&&e.name==='AbortError')return;}
+  const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);
+}
+const safeName=s=>(String(s||'').replace(/[^\wäöüÄÖÜß \-]/g,'').trim()||'export');
+
+// ---- Navigation
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => show(b.dataset.v));
+function show(v){
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.v===v));
+  ['jobs','articles','stock','data'].forEach(x => $('v-'+x).classList.toggle('hide', x!==v));
+  if (v==='jobs') JOB ? openJob(JOB.id) : loadJobs();
+  if (v==='articles') loadArticles();
+  if (v==='stock') loadStock();
+  if (v==='data') loadData();
+}
+
+// ---- Artikel
+async function loadArticles(){
+  ARTS = await api('/articles');
+  $('art-dl').innerHTML = ARTS.map(a => `<option value="${esc(a.name)}">${esc(a.category)} · ${eur(a.price)}</option>`).join('');
+  $('cat-dl').innerHTML = [...new Set(ARTS.map(a=>a.category).filter(Boolean))].map(c=>`<option value="${esc(c)}">`).join('');
+  renderArticles();
+}
+async function loadKp(){KP = await api('/kabelplan/devices');$('kp-dl').innerHTML = KP.map(d => `<option value="${esc(d.label)}">${esc(d.grp||'')}</option>`).join('');}
+const kpLabel = id => (KP.find(d => d.id===id)||{}).label || '';
+function kpIdFrom(v){v=v.trim();if(!v)return'';const d=KP.find(d=>d.label===v)||KP.find(d=>d.id===v)||KP.find(d=>d.label.toLowerCase()===v.toLowerCase());return d?d.id:null;}
+function renderArticles(){
+  const f = $('a-filter').value.toLowerCase();
+  $('art-tb').innerHTML = ARTS.filter(a => (a.name+' '+a.category+' '+(a.manufacturer||'')).toLowerCase().includes(f)).map(a => `
+    <tr class="click" onclick="editArticle(${a.id})">
+      <td class="mut">${esc(a.category)}</td>
+      <td>${esc(a.name)} ${a.kabelplan_id?`<span class="pill" title="${esc(kpLabel(a.kabelplan_id))}">Kabelplan</span>`:''} ${a.link_count?`<span class="pill">+${a.link_count} Zubehör</span>`:''} ${a.unit_count?`<span class="pill">${a.unit_count} SN</span>`:''}</td>
+      <td class="n">${a.stock}</td><td class="n">${eur(a.price)}</td>
+      <td class="n"><button class="x" title="Löschen" onclick="event.stopPropagation();delArticle(${a.id})">×</button></td>
+    </tr>`).join('') || '<tr><td colspan="5" class="mut">Noch keine Artikel. Lege oben einen an oder importiere eine CSV.</td></tr>';
+}
+function findArt(name){name=name.trim().toLowerCase();if(!name)return null;return ARTS.find(a=>a.name.toLowerCase()===name)||ARTS.find(a=>a.name.toLowerCase().includes(name));}
+function resetArticleForm(){
+  EDIT_ART = null;
+  ['name','category','notes','manufacturer','inv_no','purchase_date','kp'].forEach(k => $('af-'+k).value=''); $('af-kp-hint').textContent='';
+  $('af-stock').value=1; $('af-price').value=0; $('af-value').value=0; $('af-stock').disabled=false;
+  $('units-box').classList.add('hide'); $('af-title').textContent='Neuer Artikel';
+  $('af-cancel').classList.add('hide'); $('links-box').classList.add('hide');
+}
+async function editArticle(id){
+  const a = ARTS.find(x => x.id===id); EDIT_ART = a;
+  ['name','category','stock','price','notes','manufacturer','inv_no','purchase_date','value'].forEach(k => $('af-'+k).value = a[k] ?? '');
+  $('af-kp').value = kpLabel(a.kabelplan_id) || a.kabelplan_id || ''; $('af-kp-hint').textContent = a.kabelplan_id ? '('+a.kabelplan_id+')' : '';
+  $('af-stock').disabled = !!a.unit_count; $('units-box').classList.remove('hide'); loadUnits();
+  $('af-title').textContent='Artikel bearbeiten';
+  $('af-cancel').classList.remove('hide'); $('links-box').classList.remove('hide');
+  loadLinks(); window.scrollTo({top:0,behavior:'smooth'});
+}
+async function saveArticle(){
+  const b = {name:$('af-name').value.trim(), category:$('af-category').value.trim(),
+    stock:parseInt($('af-stock').value)||0, price:parseFloat($('af-price').value)||0, notes:$('af-notes').value,
+    manufacturer:$('af-manufacturer').value.trim(), inv_no:$('af-inv_no').value.trim(),
+    purchase_date:$('af-purchase_date').value||null, value:parseFloat($('af-value').value)||0};
+  if (!b.name) return toast('Bezeichnung fehlt');
+  const kp = kpIdFrom($('af-kp').value); if (kp===null) return toast('Kabelplan-Gerät nicht gefunden – aus der Liste wählen oder leer lassen');
+  b.kabelplan_id = kp;
+  if (EDIT_ART){await api('/articles/'+EDIT_ART.id,'PUT',b); toast('Gespeichert')}
+  else {const r = await api('/articles','POST',b); toast('Angelegt'); await loadArticles(); return editArticle(r.id)}
+  await loadArticles();
+}
+async function delArticle(id){
+  if (!confirm('Artikel löschen? Bestehende Job-Positionen bleiben als Text erhalten.')) return;
+  await api('/articles/'+id,'DELETE'); if (EDIT_ART?.id===id) resetArticleForm(); loadArticles();
+}
+async function loadUnits(){
+  const us = await api(`/articles/${EDIT_ART.id}/units`);
+  $('units-tb').innerHTML = us.map(u => `<tr>
+    <td>${esc(u.serial)||'<span class="mut">–</span>'}</td><td>${esc(u.inv_no)}</td><td>${dat(u.purchase_date)}</td>
+    <td class="n">${u.value!=null?eur(u.value):'<span class="mut">Artikel</span>'}</td><td class="mut">${esc(u.notes)}</td>
+    <td class="n"><button class="x" onclick="delUnit(${u.id})">×</button></td></tr>`).join('')
+    || '<tr><td colspan="6" class="mut">Keine Einzelgeräte – Bestand wird manuell gezählt.</td></tr>';
+}
+async function addUnit(){
+  const v = $('un-value').value;
+  await api(`/articles/${EDIT_ART.id}/units`,'POST',{serial:$('un-serial').value.trim(), inv_no:$('un-inv_no').value.trim(),
+    purchase_date:$('un-purchase_date').value||null, value: v===''?null:parseFloat(v), notes:$('un-notes').value});
+  ['serial','inv_no','value','notes'].forEach(k=>$('un-'+k).value=''); $('un-serial').focus();
+  await refreshArt();
+}
+async function delUnit(id){if(!confirm('Gerät entfernen?'))return; await api('/units/'+id,'DELETE'); await refreshArt()}
+async function refreshArt(){const id=EDIT_ART.id; await loadArticles(); editArticle(id)}
+$('un-serial').addEventListener('keydown', e => e.key==='Enter' && addUnit());
+async function loadLinks(){
+  const ls = await api(`/articles/${EDIT_ART.id}/links`);
+  $('links-tb').innerHTML = ls.map(l => `<tr>
+    <td>${fnum(l.qty)} ×</td><td>${esc(l.child_name)}</td>
+    <td class="n">${l.included ? '<span class="pill">inkl.</span>' : eur(l.child_price)}</td>
+    <td class="n"><button class="x" onclick="delLink(${l.id})">×</button></td></tr>`).join('')
+    || '<tr><td class="mut">Kein Zubehör verknüpft.</td></tr>';
+}
+async function addLink(){
+  const a = findArt($('lk-art').value); if (!a) return toast('Artikel nicht gefunden');
+  await api(`/articles/${EDIT_ART.id}/links`,'POST',{child_id:a.id, qty:parseFloat($('lk-qty').value)||1, included:$('lk-inc').checked});
+  $('lk-art').value=''; $('lk-qty').value=1; $('lk-inc').checked=false; loadLinks(); loadArticles();
+}
+async function delLink(id){await api('/links/'+id,'DELETE'); loadLinks(); loadArticles()}
+async function importCsv(inp){const t=await readCsvFile(inp.files[0]);inp.value='';const r=await api('/articles/import','POST',{text:t});toast(r.imported+' Artikel importiert');loadArticles();}
+
+// ---- Jobs
+async function loadJobs(){
+  const js = await api('/jobs');
+  $('jobs-tb').innerHTML = js.map(j => `<tr class="click" onclick="openJob(${j.id})">
+    <td class="mut">${dat(j.start_date)}${j.end_date && j.end_date!==j.start_date ? '–'+dat(j.end_date):''}</td>
+    <td>${esc(j.name)}</td><td class="mut">${esc(j.customer)}</td><td class="n">${eur(j.total)}</td></tr>`).join('')
+    || '<tr><td colspan="4" class="mut">Noch keine Jobs.</td></tr>';
+}
+async function createJob(){
+  const b = {name:$('nj-name').value.trim(), customer:$('nj-customer').value, start_date:$('nj-start').value||null, end_date:$('nj-end').value||null, factor:1};
+  if (!b.name) return toast('Name fehlt');
+  const r = await api('/jobs','POST',b); ['name','customer','start','end'].forEach(k=>$('nj-'+k).value=''); openJob(r.id);
+}
+async function openJob(id){
+  if (!ARTS.length) await loadArticles();
+  JOB = await api('/jobs/'+id);
+  $('joblist').classList.add('hide'); $('jobdetail').classList.remove('hide');
+  ['name','customer','location','notes','factor'].forEach(k => $('j-'+k).value = JOB[k] ?? '');
+  $('j-start').value = JOB.start_date || ''; $('j-end').value = JOB.end_date || '';
+  renderPositions();
+}
+function renderPositions(){
+  $('pos-tb').innerHTML = JOB.positions.map(p => {
+    const w = p.warning ? `<span class="warn">⚠ benötigt ${fnum(p.warning.need)}, frei ${fnum(p.warning.free)} von ${p.warning.stock}</span>` : '';
+    const pad = p.depth ? `padding-left:${8+p.depth*16}px` : '';
+    return `<tr class="${p.depth?'sub':''} ${p.warning?'bad':''}">
+      <td style="${pad}">${p.depth?'↳ ':''}${esc(p.name)}${p.source==='kabelplan'?' <span class="pill">Kabelplan</span>':''}${w}</td>
+      <td class="n"><input type="number" step="1" inputmode="decimal" value="${p.qty}" onchange="upd(${p.id},{qty:+this.value})"></td>
+      <td class="n">${p.included ? '<span class="pill" title="Tippen zum Verrechnen" style="cursor:pointer" onclick="upd('+p.id+',{included:false})">inkl.</span>'
+        : `<input type="number" step="0.01" inputmode="decimal" value="${p.price}" onchange="upd(${p.id},{price:+this.value})">`}</td>
+      <td class="n"><input type="number" step="0.1" inputmode="decimal" value="${p.factor ?? ''}" placeholder="${fnum(JOB.factor)}" onchange="this.value===''?upd(${p.id},{clear_factor:true}):upd(${p.id},{factor:+this.value})"></td>
+      <td class="n"><input type="number" step="1" inputmode="decimal" value="${p.discount||0}" onchange="upd(${p.id},{discount:+this.value})"></td>
+      <td class="n">${p.included ? '–' : eur(p.total)}</td>
+      <td class="n"><button class="x" title="Entfernen" onclick="delPos(${p.id})">×</button></td></tr>`;
+  }).join('') || '<tr><td colspan="7" class="mut">Noch kein Material gebucht.</td></tr>';
+  $('j-total').textContent = 'Summe netto ' + eur(JOB.total);
+  $('j-warn').innerHTML = JOB.warning_count ? `<span class="pill w">⚠ ${JOB.warning_count} Artikel überbucht im Zeitraum</span>` : '';
+}
+async function saveJob(){
+  await api('/jobs/'+JOB.id,'PUT',{name:$('j-name').value, customer:$('j-customer').value, location:$('j-location').value,
+    notes:$('j-notes').value, start_date:$('j-start').value||null, end_date:$('j-end').value||null, factor:parseFloat($('j-factor').value)||1});
+  toast('Gespeichert'); openJob(JOB.id);
+}
+async function addArticle(){
+  const a = findArt($('add-art').value); if (!a) return toast('Artikel nicht gefunden');
+  await api(`/jobs/${JOB.id}/positions`,'POST',{article_id:a.id, qty:parseFloat($('add-qty').value)||1});
+  $('add-art').value=''; $('add-qty').value=1; openJob(JOB.id);
+}
+async function addFree(){
+  await api(`/jobs/${JOB.id}/positions`,'POST',{name:$('fp-name').value, qty:parseFloat($('fp-qty').value)||1, price:parseFloat($('fp-price').value)||0});
+  ['name','price'].forEach(k=>$('fp-'+k).value=''); $('fp-qty').value=1; openJob(JOB.id);
+}
+async function upd(id, body){await api('/positions/'+id,'PUT',body); openJob(JOB.id)}
+async function delPos(id){await api('/positions/'+id,'DELETE'); openJob(JOB.id)}
+async function copyJob(){const r = await api(`/jobs/${JOB.id}/copy`,'POST'); toast('Kopiert'); openJob(r.id)}
+async function deleteJob(){if(!confirm('Job löschen?'))return; await api('/jobs/'+JOB.id,'DELETE'); closeJob()}
+function closeJob(){JOB=null; $('jobdetail').classList.add('hide'); $('joblist').classList.remove('hide'); loadJobs()}
+$('add-art').addEventListener('keydown', e => e.key==='Enter' && addArticle());
+
+// ---- Lagerstand
+async function loadStock(){
+  const s=$('s-start').value, e=$('s-end').value;
+  const arts = s ? await api(`/availability?start=${s}${e?'&end='+e:''}`) : (await api('/articles')).map(a=>({...a,booked:0,free:a.stock}));
+  $('stock-tb').innerHTML = arts.map(a => `<tr class="${a.free<0?'bad':''}">
+    <td class="mut">${esc(a.category)}</td><td>${esc(a.name)}</td><td class="n">${a.stock}</td>
+    <td class="n">${s?fnum(a.booked):'–'}</td><td class="n" style="font-weight:600;color:${a.free<0?'var(--warn)':a.free===0?'var(--mut)':'var(--ok)'}">${fnum(a.free)}</td></tr>`).join('')
+    || '<tr><td colspan="5" class="mut">Noch keine Artikel.</td></tr>';
+}
+
+// ---- Excel (ExcelJS, läuft offline)
+const EURF='#,##0.00 "€"';
+function headRow(ws,r,labels){labels.forEach((h,i)=>{const c=ws.getCell(r,i+1);c.value=h;c.font={bold:true,color:{argb:'FFFFFFFF'}};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF222222'}};});}
+const thin={bottom:{style:'thin',color:{argb:'FFBBBBBB'}}};
+async function xlsxSave(wb,name){const buf=await wb.xlsx.writeBuffer();await saveBlob(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),name);}
+async function exportJob(){
+  const job=getJob(JOB.id);const wb=new ExcelJS.Workbook();const ws=wb.addWorksheet('Kalkulation');
+  ws.getCell('A1').value=job.name;ws.getCell('A1').font={size:14,bold:true};
+  let zr=dat(job.start_date);if(job.end_date&&job.end_date!==job.start_date)zr+=' – '+dat(job.end_date);
+  let r=2;[['Kunde',job.customer],['Zeitraum',zr],['Ort',job.location],['Faktor (Standard)',job.factor]].forEach(([k,v])=>{ws.getCell(r,1).value=k;ws.getCell(r,1).font={bold:true};ws.getCell(r,2).value=v;r++;});
+  if(job.notes){ws.getCell(r,1).value='Notiz';ws.getCell(r,1).font={bold:true};ws.getCell(r,2).value=job.notes;r++;}
+  r++;headRow(ws,r,['Pos','Kategorie','Bezeichnung','Menge','Preis/Tag','Faktor','Rabatt %','Summe']);const first=r+1;let mn=0,sn=0;
+  job.positions.forEach(p=>{r++;let pos;if(p.depth===0){mn++;sn=0;pos=String(mn);}else{sn++;pos=`${mn}.${sn}`;}
+    const name=(p.depth?'    '.repeat(p.depth)+'↳ ':'')+p.name;
+    [pos,p.category||'',name,p.qty,p.price,p.eff_factor,p.discount||0].forEach((v,i)=>ws.getCell(r,i+1).value=v);
+    if(p.included){ws.getCell(r,8).value='inkl.';ws.getCell(r,8).alignment={horizontal:'right'};}else ws.getCell(r,8).value={formula:`D${r}*E${r}*F${r}*(1-G${r}/100)`,result:p.total};
+    ws.getCell(r,5).numFmt=EURF;ws.getCell(r,8).numFmt=EURF;
+    for(let i=1;i<=8;i++){ws.getCell(r,i).border=thin;if(p.depth)ws.getCell(r,i).font={color:{argb:'FF555555'}};}});
+  const last=r;r+=2;ws.getCell(r,7).value='Summe netto';ws.getCell(r,7).font={bold:true};
+  const t=ws.getCell(r,8);t.value=last>=first?{formula:`SUM(H${first}:H${last})`,result:job.total}:0;t.font={bold:true};t.numFmt=EURF;
+  [6,16,42,8,12,8,10,14].forEach((w,i)=>ws.getColumn(i+1).width=w);ws.views=[{state:'frozen',ySplit:first-1}];
+  await xlsxSave(wb,safeName(job.name)+'.xlsx');
+}
+async function exportStock(){
+  const s=$('s-start').value,e=$('s-end').value;const arts=s?await api(`/availability?start=${s}${e?'&end='+e:''}`):(await api('/articles')).map(a=>({...a,booked:0,free:a.stock}));
+  const wb=new ExcelJS.Workbook();const ws=wb.addWorksheet('Lagerstand');headRow(ws,1,['Kategorie','Artikel','Bestand','Gebucht','Frei','Preis/Tag']);
+  arts.forEach((a,i)=>{const r=i+2;[a.category,a.name,a.stock,a.booked,a.free,a.price].forEach((v,j)=>ws.getCell(r,j+1).value=v);ws.getCell(r,6).numFmt=EURF;});
+  [16,40,10,10,10,12].forEach((w,i)=>ws.getColumn(i+1).width=w);await xlsxSave(wb,'Lagerstand.xlsx');
+}
+async function exportInventory(){
+  const arts=listArticles();const units={};S.units.slice().sort((a,b)=>(a.inv_no||'').localeCompare(b.inv_no||'')||(a.serial||'').localeCompare(b.serial||'')||a.id-b.id).forEach(u=>(units[u.article_id]??=[]).push(u));
+  const wb=new ExcelJS.Workbook();const ws=wb.addWorksheet('Inventar');
+  ws.getCell('A1').value='Inventarliste KLEEM Videoproduktion';ws.getCell('A1').font={size:14,bold:true};ws.getCell('A2').value='Stand '+new Date().toLocaleDateString('de-AT');
+  const hr=4;headRow(ws,hr,['Inv.-Nr.','Kategorie','Hersteller','Artikel','Seriennummer','Kaufdatum','Menge','Wert/Stk','Gesamtwert','Notiz']);
+  let r=hr;const subs=[];const cats=[];arts.forEach(a=>{if(!cats.length||cats[cats.length-1][0]!==(a.category||''))cats.push([a.category||'',[]]);cats[cats.length-1][1].push(a);});
+  let grand=0;
+  cats.forEach(([cat,items])=>{const start=r+1;let sq=0,sv=0;
+    items.forEach(a=>{const us=units[a.id];const lines=us?us.map(u=>[u.inv_no||a.inv_no,u.serial,u.purchase_date||a.purchase_date,1,u.value!=null?u.value:a.value,u.notes]):[[a.inv_no,'',a.purchase_date,a.stock,a.value,a.notes]];
+      lines.forEach(([inv,sn,pd,qty,val,note])=>{r++;[inv,a.category,a.manufacturer,a.name,sn,dat(pd),qty,val||0].forEach((v,i)=>ws.getCell(r,i+1).value=v);
+        ws.getCell(r,9).value={formula:`G${r}*H${r}`,result:qty*(val||0)};ws.getCell(r,10).value=note;ws.getCell(r,8).numFmt=EURF;ws.getCell(r,9).numFmt=EURF;
+        for(let i=1;i<=10;i++)ws.getCell(r,i).border=thin;sq+=qty;sv+=qty*(val||0);});});
+    r++;ws.getCell(r,4).value='Summe '+(cat||'ohne Kategorie');ws.getCell(r,7).value={formula:`SUM(G${start}:G${r-1})`,result:sq};
+    ws.getCell(r,9).value={formula:`SUM(I${start}:I${r-1})`,result:sv};ws.getCell(r,9).numFmt=EURF;grand+=sv;
+    for(let i=1;i<=10;i++){ws.getCell(r,i).font={bold:true};ws.getCell(r,i).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFEEEEEE'}};}subs.push(r);});
+  r+=2;ws.getCell(r,4).value='Gesamtwert Inventar';ws.getCell(r,4).font={bold:true,size:12};
+  const g=ws.getCell(r,9);g.value=subs.length?{formula:subs.map(x=>'I'+x).join('+'),result:grand}:0;g.font={bold:true,size:12};g.numFmt=EURF;
+  [11,14,14,34,18,11,7,12,13,30].forEach((w,i)=>ws.getColumn(i+1).width=w);ws.views=[{state:'frozen',ySplit:hr}];ws.autoFilter={from:{row:hr,column:1},to:{row:hr,column:10}};
+  const ws2=wb.addWorksheet('Übersicht');headRow(ws2,1,['Kategorie','Hersteller','Artikel','Bestand','Wert/Stk','Gesamtwert','Preis/Tag','Seriennummern']);
+  let tot=0;arts.forEach((a,i)=>{const rr=i+2;const us=units[a.id]||[];let wsv,gw;
+    if(us.length){const tv=us.reduce((s,u)=>s+(u.value!=null?u.value:(a.value||0)),0);gw=tv;wsv=tv/us.length;}else{wsv=a.value||0;gw=null;}
+    [a.category,a.manufacturer,a.name,a.stock,wsv].forEach((v,j)=>ws2.getCell(rr,j+1).value=v);
+    const gv=gw!=null?gw:a.stock*wsv;tot+=gv;ws2.getCell(rr,6).value=gw!=null?gw:{formula:`D${rr}*E${rr}`,result:gv};
+    ws2.getCell(rr,7).value=a.price;ws2.getCell(rr,8).value=us.map(u=>u.serial).filter(Boolean).join(', ')||a.notes;[5,6,7].forEach(j=>ws2.getCell(rr,j).numFmt=EURF);});
+  const last=arts.length+1;ws2.getCell(last+2,3).value='Gesamt';ws2.getCell(last+2,3).font={bold:true};
+  const g2=ws2.getCell(last+2,6);g2.value={formula:`SUM(F2:F${last})`,result:tot};g2.font={bold:true};g2.numFmt=EURF;
+  [14,14,34,9,12,13,11,40].forEach((w,i)=>ws2.getColumn(i+1).width=w);ws2.views=[{state:'frozen',ySplit:1}];
+  await xlsxSave(wb,'Inventar.xlsx');
+}
+
+// ---- Kabelplan
+function modal(html){const m=$('modal');m.innerHTML=`<div class="dlg">${html}</div>`;m.classList.remove('hide');m.onclick=e=>{if(e.target===m)closeModal()}}
+function closeModal(){$('modal').classList.add('hide');$('modal').innerHTML=''}
+function copyText(ta){ta.select();ta.setSelectionRange(0,ta.value.length);
+  if(navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(ta.value).then(()=>toast('Kopiert'),()=>{try{document.execCommand('copy');toast('Kopiert')}catch(e){toast('Text markiert – jetzt kopieren')}});
+  else{let ok=false;try{ok=document.execCommand('copy')}catch(e){}toast(ok?'Kopiert':'Text markiert – jetzt kopieren');}}
+async function kpAutomap(){
+  const r = await api('/kabelplan/automap','POST'); await loadArticles();
+  modal(`<h2>Kabelplan-Zuordnung</h2>
+    <p><b>${r.mapped.length} Artikel zugeordnet.</b> ${r.unmapped.length} ohne Treffer – für Kabel, Zubehör und Verbrauchsmaterial ist das richtig so.</p>
+    ${r.mapped.length?`<div class="tw"><table><tr><th>Artikel</th><th>Kabelplan-Gerät</th></tr>${r.mapped.map(x=>`<tr><td>${esc(x.article)}</td><td>${esc(x.kabelplan)}</td></tr>`).join('')}</table></div>`:''}
+    <p class="mut">Bitte kurz prüfen. Falsche Treffer korrigierst du beim Artikel im Feld „Kabelplan-Gerät“.</p>
+    <div class="row"><span style="flex:1"></span><button class="b p" onclick="closeModal()">OK</button></div>`);
+}
+async function kpUpload(inp){const t=await readFile(inp.files[0]);inp.value='';const r=await api('/kabelplan/devices','POST',{text:t});await loadKp();toast(r.imported+' Kabelplan-Geräte geladen');loadData();}
+async function kpSend(){
+  const d = await api(`/jobs/${JOB.id}/kabelplan.json`);persist();
+  const n = d.positionen.filter(p=>p.typ==='artikel').length, nk = d.positionen.filter(p=>p.typ==='artikel'&&p.kabelplan_id).length;
+  modal(`<h2>An Kabelplan senden</h2>
+    <p><b>Am iPad brauchst du nichts zu kopieren:</b> Wechsle oben zu „Kabelplan“ → Pläne → „Aus Lager übernehmen“ und wähle diesen Job.</p>
+    <p>${n} Hauptartikel, davon <b>${nk} mit Kabelplan-Gerät</b>. Mitgeschickt wird, wie viele Geräte im Zeitraum frei sind – der Kabelplan markiert den Rest als Zumiete.</p>
+    <details><summary class="mut">Für ein anderes Gerät: als Text oder Datei</summary><textarea id="kp-ta" readonly>${esc(JSON.stringify(d,null,1))}</textarea>
+    <div class="row"><span style="flex:1"></span><button class="b" onclick="saveBlob(new Blob([$('kp-ta').value],{type:'application/json'}),safeName(JOB.name)+'.lager-job.json')">Datei speichern</button><button class="b" onclick="copyText($('kp-ta'))">Kopieren</button></div></details>
+    <div class="row" style="margin-top:10px"><button class="b" onclick="closeModal()">Schließen</button><span style="flex:1"></span><a class="b p" style="text-decoration:none" href="index.html#lager">Zum Kabelplan</a></div>`);
+}
+let PACK=null;
+function packlistenAusKabelplan(){try{const d=JSON.parse(localStorage.getItem(K_KP_PACK)||'null');return d&&Array.isArray(d.plans)?d.plans:[];}catch(e){return[];}}
+function kpPack(){
+  const pls=packlistenAusKabelplan();const mine=pls.filter(p=>p.plan&&p.plan.lager&&p.plan.lager.jobId===JOB.id);const rest=pls.filter(p=>!mine.includes(p));
+  modal(`<h2>Packliste aus dem Kabelplan übernehmen</h2>
+    ${pls.length?`<p class="mut">Pläne aus dem Kabelplan auf diesem iPad${mine.length?' – passend zu diesem Job zuerst':''}:</p>
+      <div class="tw"><table>${[...mine,...rest].map((p,i)=>`<tr class="click" onclick="pkPick(${pls.indexOf(p)})"><td><b>${esc(p.plan.name)}</b>${mine.includes(p)?' <span class="pill">dieser Job</span>':''}</td><td class="mut">${p.geraete.reduce((s,g)=>s+g.menge,0)} Geräte · ${p.kabel.reduce((s,k)=>s+k.menge,0)} Kabel</td><td class="n">Übernehmen →</td></tr>`).join('')}</table></div>`
+      :'<p class="mut">Auf diesem iPad liegt noch kein Plan im Kabelplan. Lege dort einen an oder füge eine Packliste unten ein.</p>'}
+    <details style="margin-top:10px" ${pls.length?'':'open'}><summary class="mut">Packliste einfügen oder Datei wählen</summary>
+      <textarea id="pk-ta" placeholder="Hier einfügen …"></textarea>
+      <div class="row"><label class="b" style="flex:0 0 auto">Datei wählen<input type="file" accept=".json" class="hide" onchange="pkFile(this)"></label><span style="flex:1"></span><button class="b p" onclick="pkPreview()">Weiter</button></div></details>
+    <div class="row" style="margin-top:10px"><button class="b" onclick="closeModal()">Abbrechen</button></div>`);
+}
+function pkPick(i){pkPreview(packlistenAusKabelplan()[i]);}
+async function pkFile(inp){$('pk-ta').value=await readFile(inp.files[0]);pkPreview();}
+const KIND={geraet:'Gerät',zumiete:'Zumiete',kabel:'Kabel',zubehoer:'Zubehör',software:'Software',case:'Case'};
+async function pkPreview(d){
+  if(!d){try{d=JSON.parse($('pk-ta').value)}catch(e){return toast('Kein gültiges JSON')}}
+  PACK = await api(`/jobs/${JOB.id}/packliste/preview`,'POST',{packliste:d});
+  modal(`<h2>Packliste übernehmen${PACK.plan&&PACK.plan.name?' – '+esc(PACK.plan.name):''}</h2>
+    <p class="mut">Pro Zeile: einem Lagerartikel zuordnen (Preis und Zubehör kommen mit), als freie Position mit 0 € übernehmen oder überspringen. Zuordnungen für Kabel, Zubehör und Software merkt sich das Lager.</p>
+    <div class="tw"><table><thead><tr><th>Art</th><th>Bezeichnung</th><th class="n">Menge</th><th>Übernehmen als</th><th>Lagerartikel</th></tr></thead><tbody>
+    ${PACK.lines.map((l,i)=>`<tr><td class="mut">${KIND[l.kind]||l.kind}</td><td>${esc(l.label)}${l.info?`<span class="mut" style="display:block">${esc(l.info)}</span>`:''}</td>
+      <td class="n">${fnum(l.qty)}${l.kind==='geraet'&&l.booked?`<span class="mut" style="display:block">im Job: ${fnum(l.booked)}</span>`:''}</td>
+      <td><select id="pk-m${i}"><option value="article" ${l.mode==='article'?'selected':''}>Artikel</option><option value="free" ${l.mode==='free'?'selected':''}>Freie Position</option><option value="skip" ${l.mode==='skip'?'selected':''}>Überspringen</option></select></td>
+      <td><input id="pk-a${i}" list="art-dl" value="${esc(l.article_name||'')}" placeholder="Artikel suchen …"></td></tr>`).join('')}
+    </tbody></table></div>
+    <div class="row" style="margin-top:10px"><button class="b" onclick="closeModal()">Abbrechen</button><span style="flex:1"></span><button class="b p" onclick="pkApply()">In den Job übernehmen</button></div>`);
+}
+async function pkApply(){
+  const lines=[];
+  for(const [i,l] of PACK.lines.entries()){let mode=$('pk-m'+i).value,aid=null;
+    if(mode==='article'){const a=findArt($('pk-a'+i).value||'');if(!a){toast(`Zeile ${i+1}: Artikel nicht gefunden – als freie Position`);mode='free'}else aid=a.id}
+    lines.push({kind:l.kind,label:l.label,qty:l.qty,booked:l.booked||0,mode,article_id:aid,remember:true});}
+  const r=await api(`/jobs/${JOB.id}/packliste/apply`,'POST',{lines});closeModal();toast(`${r.added} Positionen übernommen`);openJob(JOB.id);
+}
+function exportKpInventory(){const b=lagerBridge();saveBlob(new Blob([JSON.stringify({kind:'kleem-lager-inventar',v:1,inventar:b.inventar},null,1)],{type:'application/json'}),'Lagerstand.kabelplan.json');}
+
+// ---- Daten
+function backup(){S.lastBackup=new Date().toISOString();persist();
+  saveBlob(new Blob([JSON.stringify({kind:'kleem-lager-backup',v:1,erstellt:S.lastBackup,state:S},null,1)],{type:'application/json'}),'KLEEM_Lager_Backup_'+S.lastBackup.slice(0,10)+'.json');loadData();}
+async function restore(inp){
+  let d;try{d=JSON.parse(await readFile(inp.files[0]))}catch(e){inp.value='';return toast('Datei ist kein gültiges JSON')}inp.value='';
+  if(!d||d.kind!=='kleem-lager-backup'||!d.state)return toast('Das ist kein Lager-Backup');
+  if(!confirm(`Backup vom ${new Date(d.erstellt).toLocaleString('de-AT')} laden? Die aktuellen Lagerdaten auf diesem iPad werden ersetzt.`))return;
+  S=Object.assign(blank(),d.state);persist();JOB=null;toast('Backup geladen');await loadKp();await loadArticles();show('jobs');}
+async function loadData(){
+  const k=kpDevices();$('kp-status').textContent=`Geräteliste: ${k.list.length} Geräte (${k.src==='kabelplan'?'direkt aus dem Kabelplan':k.src==='datei'?'aus Datei':'mitgelieferte Liste'}), ${S.articles.filter(a=>a.kabelplan_id).length} Artikel zugeordnet.`;
+  $('last-backup').textContent=S.lastBackup?'Letztes Backup: '+new Date(S.lastBackup).toLocaleString('de-AT'):'Noch kein Backup erstellt.';
+  let info=`${S.articles.length} Artikel, ${S.units.length} Einzelgeräte, ${S.jobs.length} Jobs, ${S.positions.length} Positionen.`;
+  try{if(navigator.storage&&navigator.storage.estimate){const e=await navigator.storage.estimate();info+=` Belegt ca. ${(e.usage/1048576).toFixed(1)} MB.`;}
+    if(navigator.storage&&navigator.storage.persisted)info+=(await navigator.storage.persisted())?' Speicher ist dauerhaft geschützt.':' Speicher nicht als dauerhaft markiert – regelmäßig Backup erstellen.';}catch(e){}
+  $('storage-info').textContent=info;
+}
+
+(async()=>{
+  await loadState();
+  const today = new Date().toISOString().slice(0,10);$('s-start').value = today; $('s-end').value = today;
+  try{localStorage.setItem(K_LAGER_BRIDGE,JSON.stringify(lagerBridge()));}catch(e){}
+  await loadKp(); await loadArticles(); loadJobs();
+  if(S.lastBackup&&Date.now()-new Date(S.lastBackup)>14*864e5&&S.jobs.length)toast('Letztes Backup ist über 2 Wochen alt – unter „Daten“ sichern');
+  try{if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});}catch(e){}
+})();
+</script>
+</body>
+</html>
