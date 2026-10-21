@@ -132,7 +132,8 @@ button.add{font:inherit;font-weight:700;border:0;background:var(--acc);color:#ff
     </div>
 
     <div class="card">
-      <h2>Material buchen</h2>
+      <div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">Material buchen</h2>
+        <div class="chips" style="margin:0"><button class="chip on" id="cm-own" onclick="catMode('own')">Eigenes Lager</button><button class="chip" id="cm-rent" onclick="catMode('rent')">Zumiete</button></div></div>
       <input id="cat-q" placeholder="Suchen: Name, Hersteller, Inv.-Nr. …" style="width:100%" oninput="renderCatalog()">
       <div class="chips" id="cat-chips"></div>
       <div class="chips" id="cat-sub"></div>
@@ -168,6 +169,7 @@ button.add{font:inherit;font-weight:700;border:0;background:var(--acc);color:#ff
   <div class="card">
     <h2 id="af-title">Neuer Artikel</h2>
     <div class="row">
+      <label style="flex:0 1 190px">Eigentum<select id="af-owned" onchange="ownedChanged()"><option value="1">Gehört mir (Lager)</option><option value="0">Zumiete (nicht im Lager)</option></select></label>
       <label style="flex:3 1 200px">Bezeichnung<input id="af-name"></label>
       <label>Gruppe<input id="af-category" list="cat-dl" placeholder="z. B. Video"></label>
       <label>Untergruppe<input id="af-subcategory" list="sub-dl" placeholder="z. B. Kreuzschienen"></label>
@@ -307,7 +309,7 @@ function persist(){clearTimeout(saveT);saveT=setTimeout(async()=>{
   try{localStorage.setItem(K_LAGER_BRIDGE,JSON.stringify(lagerBridge()));}catch(e){}
 },200);}
 const nid=k=>++S.seq[k];
-function migrateState(){S.articles.forEach(a=>{if(a.subcategory==null)a.subcategory='';});S.links.forEach(l=>{if(!l.kind)l.kind='zubehoer';});
+function migrateState(){S.articles.forEach(a=>{if(a.subcategory==null)a.subcategory='';if(a.owned==null)a.owned=true;});S.links.forEach(l=>{if(!l.kind)l.kind='zubehoer';});
   S.jobs.forEach(j=>{if(j.discount==null)j.discount=0;});S.importMaps=S.importMaps||{};}
 class ApiError extends Error{constructor(status,detail){super(detail);this.status=status;this.detail=detail;}}
 const err=(s,d)=>{throw new ApiError(s,d);};
@@ -321,10 +323,11 @@ function listArticles(){
   return S.articles.slice().sort((a,b)=>(a.category||'').localeCompare(b.category||'','de')||(a.subcategory||'').localeCompare(b.subcategory||'','de')||a.name.localeCompare(b.name,'de',{numeric:true}))
     .map(a=>({...a,link_count:cnt[a.id]||0,unit_count:ucnt[a.id]||0}));
 }
-function articleFields(b){return{name:String(b.name||'').trim(),category:String(b.category||'').trim(),subcategory:String(b.subcategory||'').trim(),stock:parseInt(b.stock)||0,price:+b.price||0,notes:b.notes||'',
+function articleFields(b){return{owned:b.owned!==false&&b.owned!=='false',name:String(b.name||'').trim(),category:String(b.category||'').trim(),subcategory:String(b.subcategory||'').trim(),stock:parseInt(b.stock)||0,price:+b.price||0,notes:b.notes||'',
   manufacturer:b.manufacturer||'',inv_no:b.inv_no||'',purchase_date:b.purchase_date||null,value:+b.value||0,kabelplan_id:String(b.kabelplan_id||'').trim()};}
 const casesOf=aid=>S.links.filter(l=>l.kind==='verbaut'&&l.child_id===aid).map(l=>art(l.parent_id)).filter(Boolean);
 const contentsOf=aid=>S.links.filter(l=>l.parent_id===aid).map(l=>({id:l.child_id,name:(art(l.child_id)||{}).name||'?',qty:l.qty,kind:l.kind,included:l.included})).sort((a,b)=>(a.kind>b.kind?-1:a.kind<b.kind?1:0)||a.name.localeCompare(b.name,'de'));
+const isOwn=a=>!!a&&a.owned!==false;
 function syncStock(aid){const n=S.units.filter(u=>u.article_id===aid).length;if(n)art(aid).stock=n;}
 function cycle(parent,child){const stack=[child],seen=new Set();while(stack.length){const c=stack.pop();if(c===parent)return true;if(seen.has(c))continue;seen.add(c);S.links.filter(l=>l.parent_id===c).forEach(l=>stack.push(l.child_id));}return false;}
 
@@ -340,19 +343,20 @@ function positionsOf(job){
 function overlaps(j,start,end){if(!j.start_date)return false;return j.start_date<=end&&(j.end_date||j.start_date)>=start;}
 function bookedElsewhere(start,end,exclude){
   if(!start)return{};end=end||start;const ids=new Set(S.jobs.filter(j=>j.id!==exclude&&overlaps(j,start,end)).map(j=>j.id));const o={};
-  S.positions.forEach(p=>{if(p.article_id!=null&&ids.has(p.job_id))o[p.article_id]=(o[p.article_id]||0)+(p.qty||0);});return o;
+  S.positions.forEach(p=>{if(p.article_id!=null&&!p.rent&&ids.has(p.job_id))o[p.article_id]=(o[p.article_id]||0)+(p.qty||0);});return o;
 }
 function getJob(jid){
   const job={...(jobBy(jid)||err(404,'Job nicht gefunden'))};const ps=positionsOf(job);
   const other=bookedElsewhere(job.start_date,job.end_date,jid);const need={};
-  ps.forEach(p=>{if(p.article_id!=null)need[p.article_id]=(need[p.article_id]||0)+p.qty;});
-  const warnings={};Object.entries(need).forEach(([aid,q])=>{const a=art(+aid);const st=a?a.stock:0;const free=st-(other[aid]||0);if(q>free)warnings[aid]={need:q,free,stock:st};});
-  ps.forEach(p=>p.warning=warnings[p.article_id]||null);
+  ps.forEach(p=>{if(p.article_id!=null&&!p.rent)need[p.article_id]=(need[p.article_id]||0)+p.qty;});
+  const warnings={};Object.entries(need).forEach(([aid,q])=>{const a=art(+aid);if(!isOwn(a))return;const st=a.stock;const free=st-(other[aid]||0);if(q>free)warnings[aid]={need:q,free,stock:st};});
+  ps.forEach(p=>p.warning=p.rent?null:(warnings[p.article_id]||null));
+  job.rent_total=r2(ps.filter(p=>p.rent).reduce((s,p)=>s+lineTotal(p,job.factor),0));
   job.positions=ps;Object.assign(job,totals(job,ps));job.warning_count=Object.keys(warnings).length;return job;
 }
 function addArticlePos(job_id,article_id,qty,parent=null,link_qty=null,included=false,depth=0,path=[],source='',link_kind=''){
   const a=art(article_id)||err(404,'Artikel nicht gefunden');
-  const p={id:nid('p'),job_id,article_id,parent_pos_id:parent,link_qty,link_kind,name:a.name,qty,price:a.price,factor:null,discount:0,included:included?1:0,source};
+  const p={id:nid('p'),job_id,article_id,parent_pos_id:parent,link_qty,link_kind,name:a.name,qty,price:a.price,factor:null,discount:0,included:included?1:0,source,rent:isOwn(a)?0:1};
   S.positions.push(p);
   if(depth<MAX_LINK_DEPTH)S.links.filter(l=>l.parent_id===article_id).forEach(l=>{if(path.includes(l.child_id)||l.child_id===article_id)return;
     addArticlePos(job_id,l.child_id,qty*l.qty,p.id,l.qty,!!l.included,depth+1,[...path,article_id],source,l.kind);});
@@ -382,18 +386,19 @@ function tokMatch(pairs,name){const q=toks(name);if(q.size<2)return null;
   const eq=[],sup=[];pairs.forEach(([o,ns])=>ns.forEach(n=>{const t=toks(n);if([...q].every(x=>t.has(x))){(t.size===q.size?eq:sup).push(o);}}));
   const u=a=>[...new Set(a)];return u(eq).length===1?u(eq)[0]:(!eq.length&&u(sup).length===1?u(sup)[0]:null);}
 function availForJob(job){const other=bookedElsewhere(job.start_date,job.end_date,job.id);const out={};
-  S.articles.filter(a=>a.kabelplan_id).forEach(a=>out[a.kabelplan_id]=(out[a.kabelplan_id]||0)+Math.max(0,a.stock-Math.round(other[a.id]||0)));return out;}
+  S.articles.filter(a=>a.kabelplan_id&&isOwn(a)).forEach(a=>out[a.kabelplan_id]=(out[a.kabelplan_id]||0)+Math.max(0,a.stock-Math.round(other[a.id]||0)));return out;}
 function lagerJobExport(jid){
   const job=jobBy(jid)||err(404,'Job nicht gefunden');const ps=positionsOf(job);const pos=[];
-  ps.forEach(p=>{const a=art(p.article_id);const isCase=a&&S.links.some(l=>l.parent_id===a.id&&l.kind==='verbaut');const typ=!a?'frei':isCase?'case':((p.depth===0||p.link_kind==='verbaut')?'artikel':'zubehoer');if(p.source==='kabelplan'&&typ!=='artikel')return;
-    pos.push({typ,kabelplan_id:(a&&a.kabelplan_id)||'',hersteller:(a&&a.manufacturer)||'',bezeichnung:p.name,kategorie:(a&&a.category)||'',menge:p.qty});});
+  ps.forEach(p=>{const a=art(p.article_id);const isCase=a&&S.links.some(l=>l.parent_id===a.id&&l.kind==='verbaut');
+    let typ=!a?((p.kp_id||p.rent)?'artikel':'frei'):isCase?'case':((p.depth===0||p.link_kind==='verbaut')?'artikel':'zubehoer');if(p.source==='kabelplan'&&typ!=='artikel')return;
+    pos.push({typ,kabelplan_id:(a&&a.kabelplan_id)||p.kp_id||'',hersteller:(a&&a.manufacturer)||'',bezeichnung:p.name.replace(/^Zumiete: /,''),kategorie:(a&&a.category)||'',menge:p.qty,zumiete:!!p.rent});});
   return{kind:'kleem-lager-job',v:1,job:{id:job.id,name:job.name,kunde:job.customer,von:job.start_date,bis:job.end_date,ort:job.location},
     positionen:pos,inventar:Object.entries(availForJob(job)).map(([k,v])=>({kabelplan_id:k,bestand:v}))};
 }
 function lagerBridge(){
   const today=new Date().toISOString().slice(0,10);const cut=new Date(Date.now()-90*864e5).toISOString().slice(0,10);
   const jobs=S.jobs.filter(j=>!j.end_date&&!j.start_date||(j.end_date||j.start_date||today)>=cut).sort((a,b)=>(b.start_date||'').localeCompare(a.start_date||'')).slice(0,60);
-  const inv={};S.articles.filter(a=>a.kabelplan_id).forEach(a=>inv[a.kabelplan_id]=(inv[a.kabelplan_id]||0)+a.stock);
+  const inv={};S.articles.filter(a=>a.kabelplan_id&&isOwn(a)).forEach(a=>inv[a.kabelplan_id]=(inv[a.kabelplan_id]||0)+a.stock);
   return{kind:'kleem.lager.export',v:1,updated:new Date().toISOString(),inventar:Object.entries(inv).map(([k,v])=>({kabelplan_id:k,bestand:v})),
     jobs:jobs.map(j=>lagerJobExport(j.id))};
 }
@@ -408,7 +413,8 @@ function packPreview(jid,d){
   (d.geraete||[]).forEach(g=>{const h=g.hersteller||'',n=g.bezeichnung||'';const label=!h||norm(n).startsWith(norm(h))?n:h+' '+n;
     const a=byKp[g.kabelplan_id]||matchArticle(label);const b=a?(booked[a.id]||0):0;
     if(g.zumiete){const total=need[g.kabelplan_id]||0;const dup=!!a&&b>=total;
-      lines.push({kind:'zumiete',label:'Zumiete: '+label,qty:g.menge,booked:0,mode:dup?'skip':'free',article_id:null,article_name:'',
+      const ra=S.articles.find(x=>!isOwn(x)&&x.kabelplan_id===g.kabelplan_id);
+      lines.push({kind:'zumiete',label:'Zumiete: '+label,kp_id:g.kabelplan_id,qty:g.menge,booked:0,mode:dup?'skip':(ra?'article':'free'),article_id:ra?ra.id:null,article_name:ra?ra.name:'',
         info:dup?`Im Job sind schon ${b} Stk. aus dem Lager gebucht (überbucht). Lagermenge auf ${total-g.menge} senken und Zumiete übernehmen.`:''});return;}
     lines.push({kind:'geraet',label,qty:g.menge,booked:b,mode:a?(g.menge>b?'article':'skip'):'free',article_id:a?a.id:null,article_name:a?a.name:''});});
   [['kabel','kabel'],['zubehoer','zubehoer']].forEach(([kind,key])=>(d[key]||[]).forEach(x=>{const a=matchArticle(x.bezeichnung);
@@ -424,8 +430,8 @@ function packApply(jid,lines){
   const old=S.positions.filter(p=>p.job_id===jid&&p.source==='kabelplan'&&p.parent_pos_id==null).map(p=>p.id);old.forEach(deletePos);
   let added=0;
   lines.forEach(l=>{if(l.mode==='skip')return;const qty=l.qty-(l.kind==='geraet'?(l.booked||0):0);if(qty<=0)return;
-    if(l.mode==='article'&&l.article_id){addArticlePos(jid,l.article_id,qty,null,null,false,0,[],'kabelplan');if(l.remember!==false&&!['geraet','zumiete'].includes(l.kind))S.kp_map[l.label]=l.article_id;}
-    else S.positions.push({id:nid('p'),job_id:jid,article_id:null,parent_pos_id:null,link_qty:null,name:l.label,qty,price:0,factor:1,discount:0,included:0,source:'kabelplan'});
+    if(l.mode==='article'&&l.article_id){const pid=addArticlePos(jid,l.article_id,qty,null,null,false,0,[],'kabelplan');if(l.kind==='zumiete')S.positions.find(x=>x.id===pid).rent=1;if(l.remember!==false&&!['geraet','zumiete'].includes(l.kind))S.kp_map[l.label]=l.article_id;}
+    else S.positions.push({id:nid('p'),job_id:jid,article_id:null,parent_pos_id:null,link_qty:null,name:l.label,qty,price:0,factor:1,discount:0,included:0,source:'kabelplan',rent:l.kind==='zumiete'?1:0,kp_id:l.kp_id||''});
     added++;});
   return{added,replaced:old.length};
 }
@@ -532,7 +538,10 @@ const routes=[
  ['POST',/^\/articles\/import2$/,(m,b)=>importRows(b.rows||[],b)],
  ['GET',/^\/jobs\/(\d+)\/catalog$/,m=>{const job=jobBy(+m[1])||err(404,'Job nicht gefunden');const other=bookedElsewhere(job.start_date,job.end_date,job.id);const mine={};
    S.positions.filter(p=>p.job_id===job.id&&p.article_id!=null).forEach(p=>mine[p.article_id]=(mine[p.article_id]||0)+p.qty);
-   return listArticles().map(a=>({...a,free:a.stock-(other[a.id]||0)-(mine[a.id]||0),in_job:mine[a.id]||0,cases:casesOf(a.id).map(c=>({id:c.id,name:c.name})),contents:contentsOf(a.id)}));}],
+   const arts=listArticles().map(a=>({...a,free:isOwn(a)?a.stock-(other[a.id]||0)-(mine[a.id]||0):null,in_job:mine[a.id]||0,cases:casesOf(a.id).map(c=>({id:c.id,name:c.name})),contents:contentsOf(a.id)}));
+   const haveKp=new Set(S.articles.filter(a=>a.kabelplan_id).map(a=>a.kabelplan_id));
+   const lib=kpDevices().list.filter(d=>!haveKp.has(d.id)).map(d=>({kp:true,id:'kp:'+d.id,kp_id:d.id,name:d.label,manufacturer:'',category:d.grp||'Sonstiges',subcategory:'',price:0,free:null,in_job:0,cases:[],contents:[],owned:false}));
+   return arts.concat(lib);}],
  ['DELETE',/^\/links\/(\d+)$/,m=>{S.links=S.links.filter(l=>l.id!==+m[1]);return{ok:true};}],
  ['POST',/^\/articles\/import$/,(m,b)=>{let rows=parseCsv(b.text);if(rows.length&&!/\d/.test((rows[0].slice(2,4)).join('')))rows=rows.slice(1);let n=0;
    rows.forEach(r=>{if(!r.length||!String(r[0]).trim())return;while(r.length<9)r.push('');
@@ -546,13 +555,20 @@ const routes=[
  ['GET',/^\/jobs\/(\d+)$/,m=>getJob(+m[1])],
  ['POST',/^\/jobs\/(\d+)\/positions$/,(m,b)=>{const jid=+m[1];jobBy(jid)||err(404,'Job nicht gefunden');
    if(b.article_id){const pid=addArticlePos(jid,+b.article_id,+b.qty||1);if(b.price!=null)S.positions.find(p=>p.id===pid).price=+b.price;if(b.bill_only)billOnly(pid,+b.bill_only);return{id:pid};}
-   if(!String(b.name||'').trim())err(400,'Bezeichnung fehlt');const p={id:nid('p'),job_id:jid,article_id:null,parent_pos_id:null,link_qty:null,name:b.name.trim(),qty:+b.qty||1,price:+b.price||0,factor:1,discount:0,included:0,source:''};S.positions.push(p);return{id:p.id};}],
+   if(!String(b.name||'').trim())err(400,'Bezeichnung fehlt');const p={id:nid('p'),job_id:jid,article_id:null,parent_pos_id:null,link_qty:null,name:b.name.trim(),qty:+b.qty||1,price:+b.price||0,factor:1,discount:0,included:0,source:'',rent:b.rent?1:0,kp_id:b.kp_id||''};S.positions.push(p);return{id:p.id};}],
+ ['POST',/^\/jobs\/(\d+)\/rest-zumiete$/,(m,b)=>{const jid=+m[1];const job=getJob(jid);const aid=+b.article_id;const w=job.positions.find(p=>p.article_id===aid&&p.warning);if(!w)err(400,'Nichts überbucht');
+   const miss=Math.max(0,w.warning.need-Math.max(0,w.warning.free));const a=art(aid);
+   const own=S.positions.filter(p=>p.job_id===jid&&p.article_id===aid&&!p.rent).sort((x,y)=>(y.parent_pos_id==null)-(x.parent_pos_id==null)||y.qty-x.qty);
+   let left=miss;own.forEach(p=>{if(left<=0)return;const take=Math.min(p.qty,left);p.qty-=take;p.link_qty=null;rescale(p.id,p.qty);left-=take;});
+   S.positions.filter(p=>p.job_id===jid&&p.article_id===aid&&!p.rent&&p.qty<=0).forEach(p=>deletePos(p.id));
+   S.positions.push({id:nid('p'),job_id:jid,article_id:null,parent_pos_id:null,link_qty:null,name:'Zumiete: '+a.name,qty:miss,price:a.price,factor:null,discount:0,included:0,source:'',rent:1,kp_id:a.kabelplan_id||''});return{moved:miss};}],
+ ['PUT',/^\/positions\/(\d+)\/rent$/,(m,b)=>{const p=S.positions.find(x=>x.id===+m[1])||err(404,'Position nicht gefunden');p.rent=b.rent?1:0;return{ok:true};}],
  ['PUT',/^\/positions\/(\d+)$/,(m,u)=>{const p=S.positions.find(x=>x.id===+m[1])||err(404,'Position nicht gefunden');
    ['name','price','discount'].forEach(k=>{if(u[k]!=null)p[k]=u[k];});if(u.included!=null)p.included=u.included?1:0;
    if(u.clear_factor)p.factor=null;else if(u.factor!=null)p.factor=u.factor;
    if(u.qty!=null){p.qty=u.qty;p.link_qty=null;rescale(p.id,u.qty);}return{ok:true};}],
  ['DELETE',/^\/positions\/(\d+)$/,m=>{deletePos(+m[1]);return{ok:true};}],
- ['GET',/^\/availability$/,(m,b,q)=>{const booked=bookedElsewhere(q.get('start'),q.get('end'));return listArticles().map(a=>({id:a.id,name:a.name,category:a.category,stock:a.stock,price:a.price,booked:booked[a.id]||0,free:a.stock-(booked[a.id]||0)}));}],
+ ['GET',/^\/availability$/,(m,b,q)=>{const booked=bookedElsewhere(q.get('start'),q.get('end'));return listArticles().filter(isOwn).map(a=>({id:a.id,name:a.name,category:a.category,stock:a.stock,price:a.price,booked:booked[a.id]||0,free:a.stock-(booked[a.id]||0)}));}],
  ['GET',/^\/kabelplan\/devices$/,()=>kpDevices().list],
  ['POST',/^\/kabelplan\/devices$/,(m,b)=>{const raw=b.text.replace(/^﻿/,'');const items=[];
    if(/^\s*[\[{]/.test(raw)){const d=JSON.parse(raw);(Array.isArray(d)?d:(d.lib||d.devices||[])).forEach(g=>items.push({id:g.id,mfr:g.mfr||'',name:g.name,grp:g.group||g.grp||'',aliases:g.aliases||[]}));}
@@ -620,8 +636,8 @@ function renderArticles(){
   $('art-tb').innerHTML = filteredArts().map(a => {const acc=a.link_count-(content[a.id]||0);return `
     <tr class="click" onclick="${SEL?`selTog(${a.id},!SEL.has(${a.id}))`:`editArticle(${a.id})`}">
       <td class="mut">${SEL?`<input type="checkbox" ${SEL.has(a.id)?'checked':''} onclick="event.stopPropagation();selTog(${a.id},this.checked)" style="margin-right:6px">`:''}${esc(a.category)}${a.subcategory?`<span style="display:block;font-size:12px">${esc(a.subcategory)}</span>`:''}</td>
-      <td>${esc(a.name)} ${a.kabelplan_id?`<span class="pill" title="${esc(kpLabel(a.kabelplan_id))}">Kabelplan</span>`:''} ${content[a.id]?`<span class="pill">Case · ${content[a.id]} Geräte</span>`:''} ${inCase[a.id]?`<span class="pill">im Case</span>`:''} ${acc?`<span class="pill">+${acc} Zubehör</span>`:''} ${a.unit_count?`<span class="pill">${a.unit_count} SN</span>`:''}</td>
-      <td class="n">${a.stock}</td><td class="n">${eur(a.price)}</td>
+      <td>${esc(a.name)} ${a.owned===false?'<span class="pill w">Zumiete</span>':''} ${a.kabelplan_id?`<span class="pill" title="${esc(kpLabel(a.kabelplan_id))}">Kabelplan</span>`:''} ${content[a.id]?`<span class="pill">Case · ${content[a.id]} Geräte</span>`:''} ${inCase[a.id]?`<span class="pill">im Case</span>`:''} ${acc?`<span class="pill">+${acc} Zubehör</span>`:''} ${a.unit_count?`<span class="pill">${a.unit_count} SN</span>`:''}</td>
+      <td class="n">${a.owned===false?'–':a.stock}</td><td class="n">${eur(a.price)}</td>
       <td class="n"><button class="x" title="Löschen" onclick="event.stopPropagation();delArticle(${a.id})">×</button></td>
     </tr>`}).join('') || '<tr><td colspan="5" class="mut">Noch keine Artikel. Lege oben einen an oder importiere deine Liste (Excel/CSV).</td></tr>';
 }
@@ -639,7 +655,7 @@ function findArt(name){name=name.trim().toLowerCase();if(!name)return null;retur
 function resetArticleForm(){
   EDIT_ART = null;
   ['name','category','subcategory','notes','manufacturer','inv_no','purchase_date','kp'].forEach(k => $('af-'+k).value=''); $('af-kp-hint').textContent='';
-  $('af-stock').value=1; $('af-price').value=0; $('af-value').value=0; $('af-stock').disabled=false;
+  $('af-stock').value=1; $('af-price').value=0; $('af-value').value=0; $('af-stock').disabled=false; $('af-owned').value='1';
   $('units-box').classList.add('hide'); $('af-title').textContent='Neuer Artikel';
   $('af-cancel').classList.add('hide'); $('links-box').classList.add('hide');
 }
@@ -647,14 +663,16 @@ async function editArticle(id){
   const a = ARTS.find(x => x.id===id); EDIT_ART = a;
   ['name','category','subcategory','stock','price','notes','manufacturer','inv_no','purchase_date','value'].forEach(k => $('af-'+k).value = a[k] ?? '');
   $('af-kp').value = kpLabel(a.kabelplan_id) || a.kabelplan_id || ''; $('af-kp-hint').textContent = a.kabelplan_id ? '('+a.kabelplan_id+')' : '';
-  $('af-stock').disabled = !!a.unit_count; $('units-box').classList.remove('hide'); loadUnits();
+  $('af-owned').value = a.owned===false?'0':'1';
+  $('af-stock').disabled = !!a.unit_count || a.owned===false; $('units-box').classList.remove('hide'); loadUnits();
   $('af-title').textContent='Artikel bearbeiten';
   $('af-cancel').classList.remove('hide'); $('links-box').classList.remove('hide');
   loadLinks(); window.scrollTo({top:0,behavior:'smooth'});
 }
+function ownedChanged(){const own=$('af-owned').value==='1';$('af-stock').disabled=!own||!!(EDIT_ART&&EDIT_ART.unit_count);if(!own)$('af-stock').value=0;}
 async function saveArticle(){
   const b = {name:$('af-name').value.trim(), category:$('af-category').value.trim(), subcategory:$('af-subcategory').value.trim(),
-    stock:parseInt($('af-stock').value)||0, price:parseFloat($('af-price').value)||0, notes:$('af-notes').value,
+    owned:$('af-owned').value==='1', stock:$('af-owned').value==='1'?(parseInt($('af-stock').value)||0):0, price:parseFloat($('af-price').value)||0, notes:$('af-notes').value,
     manufacturer:$('af-manufacturer').value.trim(), inv_no:$('af-inv_no').value.trim(),
     purchase_date:$('af-purchase_date').value||null, value:parseFloat($('af-value').value)||0};
   if (!b.name) return toast('Bezeichnung fehlt');
@@ -804,7 +822,7 @@ function renderPositions(){
     const w = p.warning ? `<span class="warn">⚠ benötigt ${fnum(p.warning.need)}, frei ${fnum(p.warning.free)} von ${p.warning.stock}</span>` : '';
     const pad = p.depth ? `padding-left:${8+p.depth*16}px` : '';
     return `<tr class="${p.depth?'sub':''} ${p.warning?'bad':''}">
-      <td style="${pad}">${p.depth?'↳ ':''}${esc(p.name)}${p.source==='kabelplan'?' <span class="pill">Kabelplan</span>':''}${w}</td>
+      <td style="${pad}">${p.depth?'↳ ':''}${esc(p.name)}${p.rent?' <span class="pill w">Zumiete</span>':''}${p.source==='kabelplan'?' <span class="pill">Kabelplan</span>':''}${w}${p.warning&&p.parent_pos_id==null?` <button class="z" onclick="restRent(${p.article_id})">Fehlende ${fnum(p.warning.need-Math.max(0,p.warning.free))} als Zumiete</button>`:''}</td>
       <td class="n"><input type="number" step="1" inputmode="decimal" value="${p.qty}" onchange="upd(${p.id},{qty:+this.value})"></td>
       <td class="n">${p.included ? '<span class="pill" title="Tippen zum Verrechnen" style="cursor:pointer" onclick="upd('+p.id+',{included:false})">0 €</span>'
         : `<input type="number" step="0.01" inputmode="decimal" value="${p.price}" onchange="upd(${p.id},{price:+this.value})">`}</td>
@@ -814,7 +832,8 @@ function renderPositions(){
       <td class="n" style="white-space:nowrap"><button class="z ${p.included?'on':''}" title="${p.included?'Wieder verrechnen':'Gebucht lassen, aber nicht verrechnen'}" onclick="upd(${p.id},{included:${!p.included}})">0 €</button>${p.parent_pos_id!=null?` <button class="z" title="Nur diese Position verrechnen, Rest im Case/Set 0 €" onclick="onlyThis(${p.id})">nur das</button>`:kids[p.id]?` <button class="z" title="Nur diese Position verrechnen, alles darunter 0 €" onclick="onlyBill(${p.id})">nur das</button>`:''} <button class="x" title="Entfernen" onclick="delPos(${p.id})">×</button></td></tr>`;
   }).join('') || '<tr><td colspan="7" class="mut">Noch kein Material gebucht.</td></tr>';
   $('j-total').innerHTML = (JOB.discount ? `<span>Zwischensumme</span><span>${eur(JOB.subtotal)}</span><span>Rabatt ${fnum(JOB.discount)} %</span><span>− ${eur(JOB.discount_amount)}</span>` : '')
-    + `<span class="g">Summe netto</span><span class="g">${eur(JOB.total)}</span>`;
+    + `<span class="g">Summe netto</span><span class="g">${eur(JOB.total)}</span>`
+    + (JOB.rent_total||JOB.positions.some(p=>p.rent)?`<span class="mut">davon Zumiete</span><span class="mut">${eur(JOB.rent_total)}</span>`:'');
   $('j-warn').innerHTML = JOB.warning_count ? `<span class="pill w">⚠ ${JOB.warning_count} Artikel überbucht im Zeitraum</span>` : '';
 }
 async function saveJob(){
@@ -823,36 +842,39 @@ async function saveJob(){
   toast('Gespeichert'); openJob(JOB.id);
 }
 // Katalog nach Gruppen / Untergruppen
-let CATALOG=[], CAT={g:'',s:''};
+let CATALOG=[], CAT={g:'',s:''}, CATM='own';
+function catMode(m){CATM=m;CAT={g:'',s:''};$('cm-own').classList.toggle('on',m==='own');$('cm-rent').classList.toggle('on',m==='rent');renderCatalog();}
 function renderCatalog(){
   const q=$('cat-q').value.trim().toLowerCase();
-  const groups=[...new Set(CATALOG.map(a=>a.category||'Ohne Gruppe'))].sort((a,b)=>a.localeCompare(b,'de'));
+  const ALL=CATALOG;const CATALOG_=ALL.filter(a=>CATM==='own'?(a.owned!==false):(a.owned===false));
+  const groups=[...new Set(CATALOG_.map(a=>a.category||'Ohne Gruppe'))].sort((a,b)=>a.localeCompare(b,'de'));
   if(CAT.g&&!groups.includes(CAT.g))CAT={g:'',s:''};
   $('cat-chips').innerHTML=[['','Alle'],...groups.map(g=>[g,g])].map(([v,l])=>`<button class="chip ${CAT.g===v?'on':''}" data-g="${esc(v)}">${esc(l)}</button>`).join('');
   $('cat-chips').querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{CAT={g:b.dataset.g,s:''};renderCatalog();});
-  const inG=CATALOG.filter(a=>!CAT.g||(a.category||'Ohne Gruppe')===CAT.g);
+  const inG=CATALOG_.filter(a=>!CAT.g||(a.category||'Ohne Gruppe')===CAT.g);
   const subs=CAT.g?[...new Set(inG.map(a=>a.subcategory).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'de')):[];
-  const noSub=!CATALOG.some(a=>a.subcategory);
+  const noSub=!CATALOG_.some(a=>a.subcategory);
   $('cat-sub').innerHTML=subs.length?[['','Alle '+CAT.g],...subs.map(x=>[x,x])].map(([v,l])=>`<button class="chip s ${CAT.s===v?'on':''}" data-s="${esc(v)}">${esc(l)}</button>`).join('')
-    :(noSub&&CATALOG.length?`<span class="mut" style="font-size:13px">Noch keine Untergruppen vergeben – unter <b>Artikel → „Gruppen vorschlagen“</b> automatisch zuordnen oder beim Artikel eintragen.</span>`:'');
+    :(noSub&&CATALOG_.length?`<span class="mut" style="font-size:13px">Noch keine Untergruppen vergeben – unter <b>Artikel → „Gruppen vorschlagen“</b> automatisch zuordnen oder beim Artikel eintragen.</span>`:'');
   $('cat-sub').querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{CAT.s=b.dataset.s;renderCatalog();});
   const list=inG.filter(a=>(!CAT.s||a.subcategory===CAT.s)&&(!q||[a.name,a.manufacturer,a.category,a.subcategory,a.inv_no].join(' ').toLowerCase().includes(q)));
   let lastH=null;
   $('cat-tb').innerHTML=list.slice(0,300).map(a=>{const nc=a.contents.filter(c=>c.kind==='verbaut').length;
     const h=CAT.s?null:(CAT.g?(a.subcategory||'ohne Untergruppe'):`${a.category||'Ohne Gruppe'}${a.subcategory?' › '+a.subcategory:''}`);
     const head=h&&h!==lastH?`<tr class="click" onclick="CAT={g:${JSON.stringify(a.category||'Ohne Gruppe').replace(/"/g,'&quot;')},s:${JSON.stringify(a.subcategory||'').replace(/"/g,'&quot;')}};renderCatalog()"><td colspan="5" style="background:var(--bg);font-weight:600;font-size:13px">${esc(h)} ›</td></tr>`:'';lastH=h||lastH;
-    return head+`<tr><td>${esc(a.name)}${a.manufacturer?` <span class="mut">${esc(a.manufacturer)}</span>`:''}
+    return head+`<tr><td>${esc(a.name)}${a.manufacturer?` <span class="mut">${esc(a.manufacturer)}</span>`:''}${a.kp?' <span class="pill">aus Kabelplan-Bibliothek</span>':''}
       ${nc?`<span class="mut" style="display:block;font-size:12px">Case mit ${a.contents.filter(c=>c.kind==='verbaut').map(c=>esc(c.name)).join(', ')}</span>`:''}
       ${a.cases.length?`<span class="mut" style="display:block;font-size:12px">verbaut in ${a.cases.map(c=>esc(c.name)).join(', ')}</span>`:''}
 </td>
-      <td class="n" style="font-weight:600;color:${a.free<=0?'var(--warn)':'var(--ok)'}">${fnum(a.free)}${a.in_job?`<span class="mut" style="display:block;font-weight:400;font-size:11px">${fnum(a.in_job)} im Job</span>`:''}</td>
+      <td class="n" style="font-weight:600;color:${a.free==null?'var(--warn)':a.free<=0?'var(--warn)':'var(--ok)'}">${a.free==null?'Zumiete':fnum(a.free)}${a.in_job?`<span class="mut" style="display:block;font-weight:400;font-size:11px">${fnum(a.in_job)} im Job</span>`:''}</td>
       <td class="n">${eur(a.price)}</td>
-      <td class="n"><input type="number" id="cq-${a.id}" value="1" min="1" step="1" inputmode="numeric" style="width:58px"></td>
-      <td class="n"><button class="add" title="Buchen" onclick="bookArticle(${a.id})">+</button></td></tr>`;}).join('')
-    || '<tr><td colspan="5" class="mut">Nichts gefunden.</td></tr>';
+      <td class="n"><input type="number" id="cq-${String(a.id).replace(/[^\w]/g,'_')}" value="1" min="1" step="1" inputmode="numeric" style="width:58px"></td>
+      <td class="n"><button class="add" title="Buchen" onclick='bookArticle(${JSON.stringify(a.id)})'>+</button></td></tr>`;}).join('')
+    || `<tr><td colspan="5" class="mut">${CATM==='rent'?'Keine Zumiet-Geräte gefunden. Zumiet-Artikel legst du unter Artikel mit Eigentum „Zumiete“ an; Geräte aus der Kabelplan-Bibliothek erscheinen hier automatisch.':'Nichts gefunden.'}</td></tr>`;
 }
 async function bookArticle(id){
-  const a=CATALOG.find(x=>x.id===id);const qty=parseFloat($('cq-'+id).value)||1;
+  const a=CATALOG.find(x=>x.id===id);const qty=parseFloat($('cq-'+String(id).replace(/[^\w]/g,'_')).value)||1;
+  if(a.kp){await api(`/jobs/${JOB.id}/positions`,'POST',{name:'Zumiete: '+a.name,qty,price:0,rent:true,kp_id:a.kp_id});toast(`${fnum(qty)}× ${a.name} als Zumiete gebucht – Preis in der Position eintragen`);return openJob(JOB.id);}
   if(a.cases.length)return caseChoice(a,qty);
   await api(`/jobs/${JOB.id}/positions`,'POST',{article_id:id,qty});toast(`${fnum(qty)}× ${a.name} gebucht`);openJob(JOB.id);
 }
@@ -887,6 +909,7 @@ async function addFree(){
   await api(`/jobs/${JOB.id}/positions`,'POST',{name:$('fp-name').value, qty:parseFloat($('fp-qty').value)||1, price:parseFloat($('fp-price').value)||0});
   ['name','price'].forEach(k=>$('fp-'+k).value=''); $('fp-qty').value=1; openJob(JOB.id);
 }
+async function restRent(aid){const r=await api(`/jobs/${JOB.id}/rest-zumiete`,'POST',{article_id:aid});toast(`${fnum(r.moved)} Stk. als Zumiete übernommen`);openJob(JOB.id);}
 async function upd(id, body){await api('/positions/'+id,'PUT',body); openJob(JOB.id)}
 async function delPos(id){await api('/positions/'+id,'DELETE'); openJob(JOB.id)}
 async function copyJob(){const r = await api(`/jobs/${JOB.id}/copy`,'POST'); toast('Kopiert'); openJob(r.id)}
@@ -896,7 +919,7 @@ function closeJob(){JOB=null; $('jobdetail').classList.add('hide'); $('joblist')
 // ---- Lagerstand
 async function loadStock(){
   const s=$('s-start').value, e=$('s-end').value;
-  const arts = s ? await api(`/availability?start=${s}${e?'&end='+e:''}`) : (await api('/articles')).map(a=>({...a,booked:0,free:a.stock}));
+  const arts = s ? await api(`/availability?start=${s}${e?'&end='+e:''}`) : (await api('/articles')).filter(a=>a.owned!==false).map(a=>({...a,booked:0,free:a.stock}));
   $('stock-tb').innerHTML = arts.map(a => `<tr class="${a.free<0?'bad':''}">
     <td class="mut">${esc(a.category)}${a.subcategory?' › '+esc(a.subcategory):''}</td><td>${esc(a.name)}</td><td class="n">${a.stock}</td>
     <td class="n">${s?fnum(a.booked):'–'}</td><td class="n" style="font-weight:600;color:${a.free<0?'var(--warn)':a.free===0?'var(--mut)':'var(--ok)'}">${fnum(a.free)}</td></tr>`).join('')
@@ -917,7 +940,7 @@ async function exportJob(){
   r++;headRow(ws,r,['Pos','Kategorie','Bezeichnung','Menge','Preis/Tag','Faktor','Rabatt %','Summe']);const first=r+1;let mn=0,sn=0;
   job.positions.forEach(p=>{r++;let pos;if(p.depth===0){mn++;sn=0;pos=String(mn);}else{sn++;pos=`${mn}.${sn}`;}
     const name=(p.depth?'    '.repeat(p.depth)+'↳ ':'')+p.name;
-    [pos,p.category||'',name,p.qty,p.included?0:p.price,p.eff_factor,p.discount||0].forEach((v,i)=>ws.getCell(r,i+1).value=v);
+    [pos,p.rent?'Zumiete':(p.category||''),name,p.qty,p.included?0:p.price,p.eff_factor,p.discount||0].forEach((v,i)=>ws.getCell(r,i+1).value=v);
     if(p.included){ws.getCell(r,8).value=0;ws.getCell(r,8).alignment={horizontal:'right'};}else ws.getCell(r,8).value={formula:`D${r}*E${r}*F${r}*(1-G${r}/100)`,result:p.total};
     ws.getCell(r,5).numFmt=EURF;ws.getCell(r,8).numFmt=EURF;
     for(let i=1;i<=8;i++){ws.getCell(r,i).border=thin;if(p.depth)ws.getCell(r,i).font={color:{argb:'FF555555'}};}});
@@ -930,13 +953,13 @@ async function exportJob(){
   await xlsxSave(wb,safeName(job.name)+'.xlsx');
 }
 async function exportStock(){
-  const s=$('s-start').value,e=$('s-end').value;const arts=s?await api(`/availability?start=${s}${e?'&end='+e:''}`):(await api('/articles')).map(a=>({...a,booked:0,free:a.stock}));
+  const s=$('s-start').value,e=$('s-end').value;const arts=s?await api(`/availability?start=${s}${e?'&end='+e:''}`):(await api('/articles')).filter(a=>a.owned!==false).map(a=>({...a,booked:0,free:a.stock}));
   const wb=new ExcelJS.Workbook();const ws=wb.addWorksheet('Lagerstand');headRow(ws,1,['Kategorie','Artikel','Bestand','Gebucht','Frei','Preis/Tag']);
   arts.forEach((a,i)=>{const r=i+2;[a.category,a.name,a.stock,a.booked,a.free,a.price].forEach((v,j)=>ws.getCell(r,j+1).value=v);ws.getCell(r,6).numFmt=EURF;});
   [16,40,10,10,10,12].forEach((w,i)=>ws.getColumn(i+1).width=w);await xlsxSave(wb,'Lagerstand.xlsx');
 }
 async function exportInventory(){
-  const arts=listArticles();const units={};S.units.slice().sort((a,b)=>(a.inv_no||'').localeCompare(b.inv_no||'')||(a.serial||'').localeCompare(b.serial||'')||a.id-b.id).forEach(u=>(units[u.article_id]??=[]).push(u));
+  const arts=listArticles().filter(isOwn);const units={};S.units.slice().sort((a,b)=>(a.inv_no||'').localeCompare(b.inv_no||'')||(a.serial||'').localeCompare(b.serial||'')||a.id-b.id).forEach(u=>(units[u.article_id]??=[]).push(u));
   const wb=new ExcelJS.Workbook();const ws=wb.addWorksheet('Inventar');
   ws.getCell('A1').value='Inventarliste KLEEM Videoproduktion';ws.getCell('A1').font={size:14,bold:true};ws.getCell('A2').value='Stand '+new Date().toLocaleDateString('de-AT');
   const hr=4;headRow(ws,hr,['Inv.-Nr.','Kategorie','Hersteller','Artikel','Seriennummer','Kaufdatum','Menge','Wert/Stk','Gesamtwert','Notiz']);
@@ -1023,7 +1046,7 @@ async function pkApply(){
   const lines=[];
   for(const [i,l] of PACK.lines.entries()){let mode=$('pk-m'+i).value,aid=null;
     if(mode==='article'){const a=findArt($('pk-a'+i).value||'');if(!a){toast(`Zeile ${i+1}: Artikel nicht gefunden – als freie Position`);mode='free'}else aid=a.id}
-    lines.push({kind:l.kind,label:l.label,qty:l.qty,booked:l.booked||0,mode,article_id:aid,remember:true});}
+    lines.push({kind:l.kind,label:l.label,qty:l.qty,booked:l.booked||0,mode,article_id:aid,remember:true,kp_id:l.kp_id||''});}
   const r=await api(`/jobs/${JOB.id}/packliste/apply`,'POST',{lines});closeModal();toast(`${r.added} Positionen übernommen`);openJob(JOB.id);
 }
 function exportKpInventory(){const b=lagerBridge();saveBlob(new Blob([JSON.stringify({kind:'kleem-lager-inventar',v:1,inventar:b.inventar},null,1)],{type:'application/json'}),'Lagerstand.kabelplan.json');}

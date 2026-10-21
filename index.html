@@ -1335,7 +1335,7 @@ function importLagerJob(d){
   const ok=[],miss=[];let skip=0;const added=[];
   items.forEach(it=>{const n=Math.max(0,Math.round(+(it.menge??1)));if(!n)return;
     if(it.typ&&it.typ!=='artikel'){skip++;return;}
-    const g=matchLager(it);if(!g){miss.push(`${n}× ${[it.hersteller,it.bezeichnung||it.name].filter(Boolean).join(' ')}`);return;}
+    const g=matchLager(it);if(!g){const nm=it.bezeichnung||it.name||'';miss.push(`${n}× ${it.hersteller&&!norm(nm).startsWith(norm(it.hersteller))?it.hersteller+' ':''}${nm}${it.zumiete?' (Zumiete)':''}`);return;}
     for(let i=0;i<n;i++){const x=addItem(p,g);x.rent=it.zumiete?'rent':'auto';added.push(x);}ok.push(`${n}× ${displayName(g)}`);});
   place(p,added);
   const existing=S.plans.findIndex(x=>x.lager&&j.id!=null&&x.lager.jobId===j.id);
